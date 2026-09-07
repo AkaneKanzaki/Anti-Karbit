@@ -1,0 +1,13 @@
+.venv
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.git
+.gitignore
+.vscode
+*.session
+*.session-journal
+.env
+run_app.bat
+test_waifu.png

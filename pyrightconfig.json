@@ -1,0 +1,34 @@
+{
+  "include": [
+    "app.py",
+    "config.py",
+    "main.py",
+    "setup_env.py",
+    "test_recognizer.py",
+    "core",
+    "recognizer"
+  ],
+  "exclude": [
+    "**/.venv",
+    "**/.git",
+    "**/__pycache__",
+    "web"
+  ],
+  "typeCheckingMode": "off",
+  "venvPath": "C:/Users/SHIN/develop/Antikarbit",
+  "venv": ".venv",
+  "extraPaths": [
+    "C:/Users/SHIN/develop/Antikarbit",
+    "C:/Users/SHIN/develop/Antikarbit/.venv/Lib/site-packages"
+  ],
+  "executionEnvironments": [
+    {
+      "root": "C:/Users/SHIN/develop/Antikarbit",
+      "extraPaths": [
+        "C:/Users/SHIN/develop/Antikarbit/.venv/Lib/site-packages"
+      ]
+    }
+  ],
+  "pythonVersion": "3.11",
+  "pythonPlatform": "Windows"
+}
