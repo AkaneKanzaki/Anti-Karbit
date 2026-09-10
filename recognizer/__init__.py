@@ -34,6 +34,14 @@ class InternetSearchRecognizer(BaseRecognizer):
         self.saucenao = SauceNAORecognizer(api_key=saucenao_api_key, min_similarity=saucenao_min_sim)
         self.lens = GoogleLensRecognizer(enabled=lens_enabled)
 
+    @property
+    def lens_enabled(self) -> bool:
+        return self.lens.enabled
+
+    @lens_enabled.setter
+    def lens_enabled(self, val: bool):
+        self.lens.enabled = bool(val)
+
     def get_engines(self) -> List[Tuple[str, BaseRecognizer]]:
         """
         Daftar engine pencarian berurutan untuk fallback bertahap.

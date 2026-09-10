@@ -247,7 +247,12 @@ document.addEventListener("DOMContentLoaded", () => {
         if (cmdEl) cmdEl.textContent = data.config.CLAIM_COMMAND || "/protecc";
         if (fmtEl) fmtEl.textContent = data.config.NAME_FORMAT || "full";
         if (iqdbEl) iqdbEl.textContent = `${data.config.IQDB_MIN_SIMILARITY}%`;
-        if (traceEl) traceEl.textContent = `${Math.round(data.config.TRACEMOE_MIN_SIMILARITY * 100)}%`;
+        if (traceEl) {
+          const tVal = data.config.TRACEMOE_MIN_SIMILARITY <= 1.0 
+            ? Math.round(data.config.TRACEMOE_MIN_SIMILARITY * 100) 
+            : Math.round(data.config.TRACEMOE_MIN_SIMILARITY);
+          traceEl.textContent = `${tVal}%`;
+        }
         if (trigEl) trigEl.textContent = data.config.TRIGGER_KEYWORDS || "--";
       }
     } catch (err) {
@@ -563,6 +568,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // ==========================================
+  // ==========================================
   // 4. Settings Manager
   // ==========================================
   const formSettings = document.getElementById("form-settings");
@@ -576,16 +582,22 @@ document.addEventListener("DOMContentLoaded", () => {
 
       document.getElementById("cfg-claim-cmd").value = data.CLAIM_COMMAND || "/protecc";
       document.getElementById("cfg-name-fmt").value = data.NAME_FORMAT || "full";
-      document.getElementById("cfg-iqdb-sim").value = data.IQDB_MIN_SIMILARITY || 40.0;
-      document.getElementById("cfg-trace-sim").value = data.TRACEMOE_MIN_SIMILARITY || 0.80;
+      document.getElementById("cfg-iqdb-sim").value = data.IQDB_MIN_SIMILARITY != null ? data.IQDB_MIN_SIMILARITY : 60.0;
+      
+      const traceSim = data.TRACEMOE_MIN_SIMILARITY != null ? data.TRACEMOE_MIN_SIMILARITY : 0.85;
+      document.getElementById("cfg-trace-sim").value = traceSim <= 1.0 ? Math.round(traceSim * 100) : Math.round(traceSim);
+
       if (document.getElementById("cfg-saucenao-key")) {
         document.getElementById("cfg-saucenao-key").value = data.SAUCENAO_API_KEY || "";
       }
       if (document.getElementById("cfg-saucenao-sim")) {
-        document.getElementById("cfg-saucenao-sim").value = data.SAUCENAO_MIN_SIMILARITY || 65.0;
+        document.getElementById("cfg-saucenao-sim").value = data.SAUCENAO_MIN_SIMILARITY != null ? data.SAUCENAO_MIN_SIMILARITY : 70.0;
       }
-      document.getElementById("cfg-min-delay").value = data.MIN_DELAY_SECONDS || 0.5;
-      document.getElementById("cfg-max-delay").value = data.MAX_DELAY_SECONDS || 1.5;
+      if (document.getElementById("cfg-lens-enabled")) {
+        document.getElementById("cfg-lens-enabled").checked = data.LENS_ENABLED !== false;
+      }
+      document.getElementById("cfg-min-delay").value = data.MIN_DELAY_SECONDS != null ? data.MIN_DELAY_SECONDS : 0.5;
+      document.getElementById("cfg-max-delay").value = data.MAX_DELAY_SECONDS != null ? data.MAX_DELAY_SECONDS : 1.5;
       document.getElementById("cfg-triggers").value = data.TRIGGER_KEYWORDS || "";
       document.getElementById("cfg-target-chats").value = data.TARGET_CHAT_IDS || "";
     } catch (err) {
@@ -602,17 +614,25 @@ document.addEventListener("DOMContentLoaded", () => {
     saveStatusMsg.textContent = "Menyimpan...";
     saveStatusMsg.className = "save-status";
 
+    function parseNum(id, fallback) {
+      const el = document.getElementById(id);
+      if (!el) return fallback;
+      const v = parseFloat(el.value);
+      return isNaN(v) ? fallback : v;
+    }
+
     const payload = {
-      CLAIM_COMMAND: document.getElementById("cfg-claim-cmd").value,
-      NAME_FORMAT: document.getElementById("cfg-name-fmt").value,
-      IQDB_MIN_SIMILARITY: parseFloat(document.getElementById("cfg-iqdb-sim").value),
-      TRACEMOE_MIN_SIMILARITY: parseFloat(document.getElementById("cfg-trace-sim").value),
-      SAUCENAO_API_KEY: document.getElementById("cfg-saucenao-key") ? document.getElementById("cfg-saucenao-key").value : "",
-      SAUCENAO_MIN_SIMILARITY: document.getElementById("cfg-saucenao-sim") ? parseFloat(document.getElementById("cfg-saucenao-sim").value) : 65.0,
-      MIN_DELAY_SECONDS: parseFloat(document.getElementById("cfg-min-delay").value),
-      MAX_DELAY_SECONDS: parseFloat(document.getElementById("cfg-max-delay").value),
-      TRIGGER_KEYWORDS: document.getElementById("cfg-triggers").value,
-      TARGET_CHAT_IDS: document.getElementById("cfg-target-chats").value,
+      CLAIM_COMMAND: (document.getElementById("cfg-claim-cmd").value || "/protecc").trim(),
+      NAME_FORMAT: document.getElementById("cfg-name-fmt").value || "full",
+      IQDB_MIN_SIMILARITY: parseNum("cfg-iqdb-sim", 60.0),
+      TRACEMOE_MIN_SIMILARITY: parseNum("cfg-trace-sim", 85.0),
+      SAUCENAO_API_KEY: document.getElementById("cfg-saucenao-key") ? document.getElementById("cfg-saucenao-key").value.trim() : "",
+      SAUCENAO_MIN_SIMILARITY: parseNum("cfg-saucenao-sim", 70.0),
+      LENS_ENABLED: document.getElementById("cfg-lens-enabled") ? document.getElementById("cfg-lens-enabled").checked : true,
+      MIN_DELAY_SECONDS: parseNum("cfg-min-delay", 0.5),
+      MAX_DELAY_SECONDS: parseNum("cfg-max-delay", 1.5),
+      TRIGGER_KEYWORDS: document.getElementById("cfg-triggers").value.trim(),
+      TARGET_CHAT_IDS: document.getElementById("cfg-target-chats").value.trim(),
     };
 
     try {

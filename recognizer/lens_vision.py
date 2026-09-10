@@ -31,14 +31,25 @@ _ANIME_HINTS = {
     "blue archive", "fate", "kancolle", "idolmaster",
 }
 
-# Kata-kata blacklist yang sering muncul di hasil Lens tapi bukan nama karakter
+# Kata-kata blacklist yang sering muncul di hasil Lens/search engine tapi bukan nama karakter
 _LENS_BLACKLIST_WORDS = {
+    # Mesin pencari & elemen antarmuka web
+    "google", "google search", "google lens", "google images", "search",
+    "bing", "yahoo", "yandex", "search result", "image result",
+    "sign in", "login", "signup", "register", "submit", "button", "input",
+    "captcha", "enablejs", "invalid component state", "invalid class name",
+    "privacy", "terms", "settings", "feedback", "help", "overview",
+    "loading", "error", "404", "menu", "navigate", "home", "about",
+    # JavaScript & DOM terms (sering muncul di script bundling Google)
+    "domcontentloaded", "customevent", "promise", "symbol", "constructor",
+    "component", "renderer", "decorator", "event type", "function",
+    # Artwork / Media generic terms
     "illustration", "artwork", "wallpaper", "fanart", "official art",
     "download", "pinterest", "twitter", "instagram", "deviantart",
-    "pixiv", "zerochan", "danbooru", "gelbooru",
-    "resolution", "pixels", "image", "photo", "picture",
-    "figure", "merchandise", "poster", "print", "acrylic",
-    "cosplay", "costume", "wig",
+    "pixiv", "zerochan", "danbooru", "gelbooru", "yande.re", "konachan",
+    "resolution", "pixels", "image", "photo", "picture", "screenshot",
+    "figure", "merchandise", "poster", "print", "acrylic", "standee",
+    "cosplay", "costume", "wig", "outfit", "dress",
 }
 
 
@@ -47,43 +58,50 @@ def _extract_character_from_lens_text(text_snippets: List[str]) -> Tuple[Optiona
     Analisis teks hasil Google Lens untuk mencari nama karakter anime.
     Mengembalikan (character_name, series_name) atau (None, None).
     """
-    # Pola umum nama karakter: "Character Name from Series" atau "Character Name (Series)"
     for snippet in text_snippets:
         if not snippet or len(snippet) < 3:
             continue
 
-        snippet_lower = snippet.lower()
+        snippet_clean = snippet.strip()
+        snippet_lower = snippet_clean.lower()
 
-        # Filter snippet yang jelas bukan nama karakter
+        # Filter snippet yang mengandung kata blacklist
         if any(bl in snippet_lower for bl in _LENS_BLACKLIST_WORDS):
             continue
 
         # Pola: "X from Y" atau "X - Y"
-        match_from = re.search(r"^(.+?)\s+(?:from|in|of)\s+(.+)$", snippet, re.IGNORECASE)
+        match_from = re.search(r"^(.+?)\s+(?:from|in|of)\s+(.+)$", snippet_clean, re.IGNORECASE)
         if match_from:
             char_part = match_from.group(1).strip()
             series_part = match_from.group(2).strip()
-            # Validasi: nama karakter tidak boleh terlalu panjang
-            if 2 <= len(char_part.split()) <= 4 and len(char_part) <= 40:
+            if (
+                2 <= len(char_part.split()) <= 4
+                and len(char_part) <= 40
+                and not any(bl in char_part.lower() for bl in _LENS_BLACKLIST_WORDS)
+            ):
                 return char_part, series_part
 
         # Pola: "X (Y)"
-        match_paren = re.match(r"^(.+?)\s*\(([^)]+)\)\s*$", snippet)
+        match_paren = re.match(r"^(.+?)\s*\(([^)]+)\)\s*$", snippet_clean)
         if match_paren:
             char_part = match_paren.group(1).strip()
             series_part = match_paren.group(2).strip()
-            if 1 <= len(char_part.split()) <= 4 and len(char_part) <= 40:
+            if (
+                1 <= len(char_part.split()) <= 4
+                and len(char_part) <= 40
+                and not any(bl in char_part.lower() for bl in _LENS_BLACKLIST_WORDS)
+            ):
                 return char_part, series_part
 
-        # Potensi nama karakter standalone: 1-4 kata, kapital, tidak terlalu panjang
-        words = snippet.split()
+        # Potensi nama karakter standalone: 1-4 kata, kapital, tidak mengandung kata blacklist
+        words = snippet_clean.split()
         if (
             1 <= len(words) <= 4
-            and len(snippet) <= 40
+            and len(snippet_clean) <= 40
             and all(w[0].isupper() for w in words if w and w[0].isalpha())
-            and not any(snippet_lower.startswith(bl) for bl in _LENS_BLACKLIST_WORDS)
+            and not any(bl in snippet_lower for bl in _LENS_BLACKLIST_WORDS)
         ):
-            return snippet, None
+            return snippet_clean, None
 
     return None, None
 
@@ -99,11 +117,9 @@ def _parse_lens_response(html: str) -> List[str]:
     callbacks = re.findall(r'AF_initDataCallback\(({.*?})\)', html, re.DOTALL)
     for cb in callbacks:
         try:
-            # Ambil value dari "data": [...]
             data_match = re.search(r'"data":\s*(\[.*?\])\s*[,}]', cb, re.DOTALL)
             if not data_match:
                 continue
-            # Cari semua string dalam struktur data
             strings = re.findall(r'"([^"]{3,80})"', data_match.group(1))
             text_results.extend(strings)
         except Exception:
@@ -113,23 +129,29 @@ def _parse_lens_response(html: str) -> List[str]:
     h3_texts = re.findall(r'<h3[^>]*>([^<]+)</h3>', html)
     text_results.extend(h3_texts)
 
-    # Fallback: cari tag <title> dari halaman (sering berisi query)
+    # Fallback: cari tag <title> dari halaman (HANYA jika bukan generic title search engine)
     title_match = re.search(r'<title>([^<]+)</title>', html)
     if title_match:
-        title = title_match.group(1).replace(" - Google Search", "").strip()
-        if title:
+        title = title_match.group(1).strip()
+        title = re.sub(r'\s*-\s*Google(?:\s+Search)?\s*$', '', title, flags=re.IGNORECASE).strip()
+        if title and title.lower() not in ("google", "google search", "google lens", "search"):
             text_results.append(title)
 
     # Cari string pendek (kemungkinan nama) dari dalam JSON embedding
     json_strings = re.findall(r'"([A-Z][a-zA-Z\s]{3,40})"', html)
     text_results.extend(json_strings)
 
-    # Deduplicate sambil tetap mempertahankan urutan
+    # Deduplicate sambil menyaring blacklist
     seen = set()
     unique_results = []
     for t in text_results:
         t_clean = t.strip()
-        if t_clean and t_clean not in seen:
+        t_lower = t_clean.lower()
+        if (
+            t_clean
+            and t_clean not in seen
+            and not any(bl in t_lower for bl in _LENS_BLACKLIST_WORDS)
+        ):
             seen.add(t_clean)
             unique_results.append(t_clean)
 
@@ -142,9 +164,9 @@ class GoogleLensRecognizer(BaseRecognizer):
     Digunakan sebagai fallback terakhir setelah IQDB, SauceNAO, dan Trace.moe gagal.
     100% Gratis dan TANPA API KEY — menggunakan endpoint publik Google Lens.
 
-    Catatan: Karena Google Lens tidak memberikan metadata terstruktur, akurasi
-    bergantung pada parsing teks dari hasil visual. Hasilnya dikonfirmasi via
-    AniList untuk memastikan nama yang digunakan adalah nama karakter, bukan judul anime.
+    Keamanan Klaim: Karena hasil web crawling Google tidak terstruktur, hasil Lens
+    DIWAJIBKAN lolos verifikasi AniList untuk mencegah false claim (seperti 'Google Search').
+    Jika AniList tidak mengonfirmasi karakter, Lens akan mengembalikan None secara aman.
     """
 
     def __init__(self, enabled: bool = True):
@@ -163,13 +185,11 @@ class GoogleLensRecognizer(BaseRecognizer):
         elif image_bytes.startswith(b"RIFF") and b"WEBP" in image_bytes[:16]:
             mime_type = "image/webp"
 
-        # Buat cookie jar untuk session yang valid
         cookie_jar = aiohttp.CookieJar()
 
         try:
             logger.info("Mengirim gambar ke Google Lens untuk pencarian visual...")
 
-            # Header khusus untuk upload Lens
             upload_headers = {
                 **_BROWSER_HEADERS,
                 "Referer": "https://lens.google.com/",
@@ -177,7 +197,6 @@ class GoogleLensRecognizer(BaseRecognizer):
                 "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
             }
 
-            # Buat multipart form data
             form_data = aiohttp.FormData()
             form_data.add_field(
                 "encoded_image",
@@ -195,7 +214,6 @@ class GoogleLensRecognizer(BaseRecognizer):
                 cookie_jar=cookie_jar,
                 headers=_BROWSER_HEADERS,
             ) as session:
-                # Inisiasi cookie dengan kunjungan ke Google terlebih dahulu
                 try:
                     async with session.get(
                         "https://www.google.com/",
@@ -204,9 +222,8 @@ class GoogleLensRecognizer(BaseRecognizer):
                     ) as _:
                         pass
                 except Exception:
-                    pass  # Jika gagal, lanjutkan saja
+                    pass
 
-                # Upload gambar ke Google Lens
                 async with session.post(
                     self.upload_endpoint,
                     data=form_data,
@@ -229,36 +246,34 @@ class GoogleLensRecognizer(BaseRecognizer):
             text_snippets = _parse_lens_response(html)
 
             if not text_snippets:
-                logger.warning("Google Lens tidak dapat mengekstrak teks dari respons.")
+                logger.warning("Google Lens tidak menemukan teks relevan pada respons.")
                 return None
 
             logger.info(
-                f"Google Lens menghasilkan {len(text_snippets)} fragmen teks. "
-                f"Beberapa contoh: {text_snippets[:5]}"
+                f"Google Lens menghasilkan {len(text_snippets)} kandidat teks: {text_snippets[:5]}"
             )
 
-            # Analisis teks untuk cari nama karakter
+            # Analisis teks untuk cari kandidat nama karakter
             char_name, series_name = _extract_character_from_lens_text(text_snippets)
 
             if not char_name:
-                logger.warning("Google Lens tidak berhasil mengidentifikasi nama karakter dari hasil visual.")
+                logger.warning("Google Lens tidak berhasil mengekstrak nama kandidat dari teks visual.")
                 return None
 
-            logger.info(f"Google Lens mendeteksi kandidat: '{char_name}' dari '{series_name or 'Unknown'}'")
-
-            # Verifikasi via AniList untuk memastikan ini adalah nama karakter valid
+            # Verifikasi WAJIB via AniList
             anilist_name, anilist_series = await lookup_series_from_character(char_name)
 
-            if anilist_name:
-                logger.info(f"AniList mengkonfirmasi: '{char_name}' → '{anilist_name}' dari '{anilist_series}'")
-                char_name = anilist_name
-                if anilist_series:
-                    series_name = anilist_series
-            else:
-                logger.info(
-                    f"AniList tidak menemukan '{char_name}' — menggunakan hasil Lens apa adanya. "
-                    "Mungkin karakter VTuber atau non-AniList."
+            if not anilist_name:
+                logger.warning(
+                    f"Google Lens menemukan teks '{char_name}', tetapi TIDAK terverifikasi di AniList. "
+                    "Menolak klaim untuk mencegah klaim istilah acak."
                 )
+                return None
+
+            logger.info(f"AniList mengkonfirmasi: '{char_name}' → '{anilist_name}' dari '{anilist_series}'")
+            char_name = anilist_name
+            if anilist_series:
+                series_name = anilist_series
 
             # Parse first/last name
             parts = char_name.split()
@@ -279,7 +294,7 @@ class GoogleLensRecognizer(BaseRecognizer):
                 first_name=first_name,
                 last_name=last_name,
                 series=series_name,
-                confidence=0.60,  # Confidence lebih rendah karena heuristik text-parsing
+                confidence=0.60,
                 source="google_lens",
             )
 

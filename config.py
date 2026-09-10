@@ -1,6 +1,10 @@
 import os
+import math
+import logging
 from typing import List, Dict, Any
 from dotenv import load_dotenv  # type: ignore
+
+logger = logging.getLogger("antikarbit.config")
 
 # Muat variabel lingkungan dari file .env jika ada
 load_dotenv()
@@ -18,7 +22,8 @@ class Config:
 
     # Reverse Image Search Settings (IQDB, Trace.moe, SauceNAO & Google Lens)
     IQDB_MIN_SIMILARITY: float = float(os.getenv("IQDB_MIN_SIMILARITY", "60.0"))
-    TRACEMOE_MIN_SIMILARITY: float = float(os.getenv("TRACEMOE_MIN_SIMILARITY", "0.85"))
+    _raw_tracemoe: float = float(os.getenv("TRACEMOE_MIN_SIMILARITY", "0.85"))
+    TRACEMOE_MIN_SIMILARITY: float = _raw_tracemoe / 100.0 if _raw_tracemoe > 1.0 else _raw_tracemoe
     SAUCENAO_API_KEY: str = os.getenv("SAUCENAO_API_KEY", "").strip()
     SAUCENAO_MIN_SIMILARITY: float = float(os.getenv("SAUCENAO_MIN_SIMILARITY", "70.0"))
     LENS_ENABLED: bool = os.getenv("LENS_ENABLED", "true").lower() not in ("false", "0", "no")
@@ -97,37 +102,50 @@ class Config:
 
     @classmethod
     def update_and_save(cls, new_settings: Dict[str, Any]) -> bool:
-        """Memperbarui atribut class dan menyimpan ke file .env."""
+        """Memperbarui atribut class dan menyimpan ke file .env secara aman."""
         try:
-            if "CLAIM_COMMAND" in new_settings:
+            def _to_float(val: Any, default: float) -> float:
+                if val is None or val == "":
+                    return default
+                try:
+                    f = float(val)
+                    return default if math.isnan(f) else f
+                except (ValueError, TypeError):
+                    return default
+
+            if "CLAIM_COMMAND" in new_settings and new_settings["CLAIM_COMMAND"]:
                 cls.CLAIM_COMMAND = str(new_settings["CLAIM_COMMAND"]).strip()
-            if "NAME_FORMAT" in new_settings:
+            if "NAME_FORMAT" in new_settings and new_settings["NAME_FORMAT"]:
                 cls.NAME_FORMAT = str(new_settings["NAME_FORMAT"]).strip().lower()
             if "IQDB_MIN_SIMILARITY" in new_settings:
-                cls.IQDB_MIN_SIMILARITY = float(new_settings["IQDB_MIN_SIMILARITY"])
+                cls.IQDB_MIN_SIMILARITY = _to_float(new_settings["IQDB_MIN_SIMILARITY"], cls.IQDB_MIN_SIMILARITY)
             if "TRACEMOE_MIN_SIMILARITY" in new_settings:
-                cls.TRACEMOE_MIN_SIMILARITY = float(new_settings["TRACEMOE_MIN_SIMILARITY"])
+                t_val = _to_float(new_settings["TRACEMOE_MIN_SIMILARITY"], cls.TRACEMOE_MIN_SIMILARITY)
+                # Jika user memasukkan format persen (misal 80 atau 85), ubah ke desimal 0.80 atau 0.85
+                cls.TRACEMOE_MIN_SIMILARITY = t_val / 100.0 if t_val > 1.0 else t_val
             if "SAUCENAO_API_KEY" in new_settings:
-                cls.SAUCENAO_API_KEY = str(new_settings["SAUCENAO_API_KEY"]).strip()
+                cls.SAUCENAO_API_KEY = str(new_settings["SAUCENAO_API_KEY"] or "").strip()
             if "SAUCENAO_MIN_SIMILARITY" in new_settings:
-                cls.SAUCENAO_MIN_SIMILARITY = float(new_settings["SAUCENAO_MIN_SIMILARITY"])
+                cls.SAUCENAO_MIN_SIMILARITY = _to_float(new_settings["SAUCENAO_MIN_SIMILARITY"], cls.SAUCENAO_MIN_SIMILARITY)
             if "LENS_ENABLED" in new_settings:
                 v = new_settings["LENS_ENABLED"]
                 cls.LENS_ENABLED = str(v).lower() not in ("false", "0", "no") if isinstance(v, str) else bool(v)
             if "TRIGGER_KEYWORDS" in new_settings:
-                raw = str(new_settings["TRIGGER_KEYWORDS"])
-                cls.TRIGGER_KEYWORDS = [k.strip() for k in raw.split(",") if k.strip()]
+                raw = str(new_settings["TRIGGER_KEYWORDS"] or "")
+                kw_list = [k.strip() for k in raw.split(",") if k.strip()]
+                if kw_list:
+                    cls.TRIGGER_KEYWORDS = kw_list
             if "TARGET_CHAT_IDS" in new_settings:
-                raw = str(new_settings["TARGET_CHAT_IDS"])
+                raw = str(new_settings["TARGET_CHAT_IDS"] or "")
                 cls.TARGET_CHAT_IDS = [
                     int(c.strip()) for c in raw.split(",") if c.strip().lstrip("-").isdigit()
                 ]
             if "MIN_DELAY_SECONDS" in new_settings:
-                cls.MIN_DELAY_SECONDS = float(new_settings["MIN_DELAY_SECONDS"])
+                cls.MIN_DELAY_SECONDS = _to_float(new_settings["MIN_DELAY_SECONDS"], cls.MIN_DELAY_SECONDS)
             if "MAX_DELAY_SECONDS" in new_settings:
-                cls.MAX_DELAY_SECONDS = float(new_settings["MAX_DELAY_SECONDS"])
+                cls.MAX_DELAY_SECONDS = _to_float(new_settings["MAX_DELAY_SECONDS"], cls.MAX_DELAY_SECONDS)
             if "VERIFY_TIMEOUT_SECONDS" in new_settings:
-                cls.VERIFY_TIMEOUT_SECONDS = float(new_settings["VERIFY_TIMEOUT_SECONDS"])
+                cls.VERIFY_TIMEOUT_SECONDS = _to_float(new_settings["VERIFY_TIMEOUT_SECONDS"], cls.VERIFY_TIMEOUT_SECONDS)
 
             # Baca file .env lama untuk mempertahankan TELEGRAM credentials
             env_path = os.path.join(os.path.dirname(__file__), ".env")
@@ -170,6 +188,8 @@ class Config:
             with open(env_path, "w", encoding="utf-8") as f:
                 f.writelines(new_lines)
 
+            logger.info("Konfigurasi bot berhasil diperbarui dan disimpan ke .env")
             return True
-        except Exception:
+        except Exception as e:
+            logger.error(f"Gagal memperbarui konfigurasi: {e}", exc_info=True)
             return False

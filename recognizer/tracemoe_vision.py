@@ -22,7 +22,20 @@ class TraceMoeRecognizer(BaseRecognizer):
 
     def __init__(self, min_similarity: float = 0.85):
         self.endpoint = "https://api.trace.moe/search?anilistInfo=1"
+        self._min_similarity = 0.85
         self.min_similarity = min_similarity
+
+    @property
+    def min_similarity(self) -> float:
+        return self._min_similarity
+
+    @min_similarity.setter
+    def min_similarity(self, value: float):
+        try:
+            v = float(value)
+            self._min_similarity = v / 100.0 if v > 1.0 else v
+        except (ValueError, TypeError):
+            self._min_similarity = 0.85
 
     async def identify(self, image_bytes: bytes) -> Optional[CharacterInfo]:
         headers = {

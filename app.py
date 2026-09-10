@@ -406,6 +406,7 @@ class AntiKarbitApp:
             tracemoe_min_sim=Config.TRACEMOE_MIN_SIMILARITY,
             saucenao_api_key=Config.SAUCENAO_API_KEY,
             saucenao_min_sim=Config.SAUCENAO_MIN_SIMILARITY,
+            lens_enabled=Config.LENS_ENABLED,
         )
 
         self.claimer = Claimer(
@@ -550,6 +551,8 @@ class AntiKarbitApp:
                     if hasattr(self.recognizer, "saucenao"):
                         self.recognizer.saucenao.api_key = Config.SAUCENAO_API_KEY
                         self.recognizer.saucenao.min_similarity = Config.SAUCENAO_MIN_SIMILARITY
+                    if hasattr(self.recognizer, "lens_enabled"):
+                        self.recognizer.lens_enabled = Config.LENS_ENABLED
 
                 logger.info("Pengaturan bot berhasil diperbarui dari Web Dashboard.")
                 return web.json_response({"success": True, "config": Config.as_dict()})
