@@ -581,8 +581,24 @@ class AntiKarbitApp:
             if not field or field.name != "image":
                 return web.json_response({"success": False, "message": "Field 'image' tidak ditemukan"}, status=400)
 
-            # Baca bytes dengan batasan ketat
-            image_bytes = await field.read(size_limit=_UPLOAD_MAX_BYTES)
+            # Baca bytes gambar secara streaming chunk dengan batasan ukuran
+            chunks = []
+            total_size = 0
+            while True:
+                chunk = await field.read_chunk(size=65536)
+                if not chunk:
+                    break
+                total_size += len(chunk)
+                if total_size > _UPLOAD_MAX_BYTES:
+                    max_mb = _UPLOAD_MAX_BYTES // (1024 * 1024)
+                    return web.json_response(
+                        {"success": False, "message": f"Ukuran file melebihi batas {max_mb} MB."},
+                        status=413,
+                    )
+                chunks.append(chunk)
+
+            image_bytes = b"".join(chunks)
+            del chunks
         except (ValueError, web.HTTPRequestEntityTooLarge):
             max_mb = _UPLOAD_MAX_BYTES // (1024 * 1024)
             return web.json_response(
@@ -595,12 +611,17 @@ class AntiKarbitApp:
         if not image_bytes:
             return web.json_response({"success": False, "message": "Gambar kosong"}, status=400)
 
-        logger.info(f"Web Tester: Menerima uji gambar ({len(image_bytes)} bytes)...")
-        char = await self.recognizer.identify(image_bytes)
+        logger.info(f"Web Tester: Menerima uji gambar ({len(image_bytes)} bytes, diproses in-memory)...")
+        try:
+            char = await self.recognizer.identify(image_bytes)
+        finally:
+            # Langsung hapus bytes gambar dari memori RAM agar tidak menumpuk
+            del image_bytes
+
         if not char:
             return web.json_response({
                 "success": False,
-                "message": "Karakter tidak berhasil dikenali di IQDB atau Trace.moe",
+                "message": "Karakter tidak berhasil dikenali oleh engine pencarian internet",
             })
 
         # Simulasi perintah klaim
