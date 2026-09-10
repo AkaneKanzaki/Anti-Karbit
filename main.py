@@ -30,7 +30,7 @@ def print_banner():
 ============================================================
    ANTI-KARBIT: WAIFU CLAIMER BOT (CLI HEADLESS MODE)   
 ============================================================
-* Engine Vision : IQDB.org + Trace.moe (0 API Key, Reverse Search)
+* Engine Vision : IQDB → SauceNAO → Trace.moe → Google Lens (Fallback Bertahap)
 * Claim Command : {Config.CLAIM_COMMAND}
 * Name Format   : {Config.NAME_FORMAT}
 * Trigger Words : {", ".join(Config.TRIGGER_KEYWORDS)}
@@ -67,10 +67,13 @@ async def main():
         Config.TELEGRAM_API_HASH,
     )
 
-    # Inisialisasi Vision Recognizer (IQDB + Trace.moe)
+    # Inisialisasi Vision Recognizer (IQDB + SauceNAO + Trace.moe + Google Lens)
     recognizer = get_recognizer(
         iqdb_min_sim=Config.IQDB_MIN_SIMILARITY,
         tracemoe_min_sim=Config.TRACEMOE_MIN_SIMILARITY,
+        saucenao_api_key=Config.SAUCENAO_API_KEY,
+        saucenao_min_sim=Config.SAUCENAO_MIN_SIMILARITY,
+        lens_enabled=Config.LENS_ENABLED,
     )
 
     # Inisialisasi Claimer

@@ -22,17 +22,28 @@ async def test_image(image_path: str):
     with open(image_path, "rb") as f:
         img_bytes = f.read()
 
-    print("[2] Inisialisasi recognizer pencarian internet (IQDB + Trace.moe)...")
+    # Tentukan engine yang aktif
+    engine_list = ["IQDB"]
+    if Config.SAUCENAO_API_KEY:
+        engine_list.append("SauceNAO")
+    engine_list.append("Trace.moe")
+    if Config.LENS_ENABLED:
+        engine_list.append("Google Lens")
+
+    print(f"[2] Inisialisasi recognizer: {' -> '.join(engine_list)}")
     recognizer = get_recognizer(
         iqdb_min_sim=Config.IQDB_MIN_SIMILARITY,
         tracemoe_min_sim=Config.TRACEMOE_MIN_SIMILARITY,
+        saucenao_api_key=Config.SAUCENAO_API_KEY,
+        saucenao_min_sim=Config.SAUCENAO_MIN_SIMILARITY,
+        lens_enabled=Config.LENS_ENABLED,
     )
 
-    print("[3] Mengirim ke mesin pencari internet (IQDB / Trace.moe)...")
+    print(f"[3] Mengirim ke mesin pencari internet ({' / '.join(engine_list)})...")
     result = await recognizer.identify(img_bytes)
 
     if not result:
-        print("\n[HASIL GAGAL] Karakter tidak dapat ditemukan di IQDB maupun Trace.moe.")
+        print("\n[HASIL GAGAL] Karakter tidak dapat ditemukan di semua engine pencarian.")
         return
 
     print("\n================ HASIL PENGENALAN ================")
@@ -42,6 +53,8 @@ async def test_image(image_path: str):
     print(f"Asal Seri     : {result.series or 'Unknown'}")
     print(f"Confidence    : {result.confidence * 100:.1f}%")
     print(f"Engine Sumber : {result.source}")
+    if result.alternate_names:
+        print(f"Nama Alternatif: {', '.join(result.alternate_names)}")
     print("--------------------------------------------------")
     print("Contoh Perintah Klaim yang Dihasilkan:")
     for mode in ["first", "full", "both"]:

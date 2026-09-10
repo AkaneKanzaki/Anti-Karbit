@@ -11,33 +11,15 @@ logger = logging.getLogger("antikarbit.claimer")
 
 # Urutan fallback nama yang dicoba secara otomatis jika klaim ditolak game bot
 # Contoh: full_name gagal → first_name → last_name → full_name tanpa spasi
-def _build_name_candidates(character: CharacterInfo) -> List[str]:
+def _build_name_candidates(character: CharacterInfo, name_format: str = "full") -> List[str]:
     """
-    Membangun daftar kandidat nama yang akan dicoba secara berurutan.
-    Urutan: nama lengkap → nama depan → nama belakang → nama tanpa spasi
-    Semua variasi unik, tidak ada duplikat.
+    Membangun daftar nama untuk klaim.
+    Sesuai permintaan untuk mengurangi spam di grup:
+    Hanya mengirim 1 nama spesifik (default: nama lengkap).
     """
-    seen = set()
-    candidates = []
-
-    def _add(name: str):
-        n = name.strip()
-        if n and n.lower() not in seen:
-            seen.add(n.lower())
-            candidates.append(n)
-
-    _add(character.full_name)
-    _add(character.first_name)
-    if character.last_name:
-        _add(character.last_name)
-    # Variasi: nama depan + nama belakang dibalik (Last First)
-    if character.first_name and character.last_name:
-        _add(f"{character.last_name} {character.first_name}")
-    # Variasi: tanpa spasi (misal: MikanTsumiki) — jarang dipakai tapi bisa jadi fallback
-    if " " in character.full_name:
-        _add(character.full_name.replace(" ", ""))
-
-    return candidates
+    if name_format == "first" and character.first_name:
+        return [character.first_name.strip()]
+    return [character.full_name.strip()]
 
 
 class ClaimResult:
@@ -150,8 +132,8 @@ class Claimer:
         logger.info(f"Menunggu jeda {delay:.2f}s sebelum klaim...")
         await asyncio.sleep(delay)
 
-        # Bangun semua kandidat nama yang akan dicoba
-        candidates = _build_name_candidates(character)
+        # Bangun nama untuk klaim
+        candidates = _build_name_candidates(character, self.name_format)
         logger.info(f"Kandidat nama untuk klaim: {candidates}")
 
         for idx, name in enumerate(candidates):

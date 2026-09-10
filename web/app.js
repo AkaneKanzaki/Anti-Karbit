@@ -578,6 +578,12 @@ document.addEventListener("DOMContentLoaded", () => {
       document.getElementById("cfg-name-fmt").value = data.NAME_FORMAT || "full";
       document.getElementById("cfg-iqdb-sim").value = data.IQDB_MIN_SIMILARITY || 40.0;
       document.getElementById("cfg-trace-sim").value = data.TRACEMOE_MIN_SIMILARITY || 0.80;
+      if (document.getElementById("cfg-saucenao-key")) {
+        document.getElementById("cfg-saucenao-key").value = data.SAUCENAO_API_KEY || "";
+      }
+      if (document.getElementById("cfg-saucenao-sim")) {
+        document.getElementById("cfg-saucenao-sim").value = data.SAUCENAO_MIN_SIMILARITY || 65.0;
+      }
       document.getElementById("cfg-min-delay").value = data.MIN_DELAY_SECONDS || 0.5;
       document.getElementById("cfg-max-delay").value = data.MAX_DELAY_SECONDS || 1.5;
       document.getElementById("cfg-triggers").value = data.TRIGGER_KEYWORDS || "";
@@ -601,6 +607,8 @@ document.addEventListener("DOMContentLoaded", () => {
       NAME_FORMAT: document.getElementById("cfg-name-fmt").value,
       IQDB_MIN_SIMILARITY: parseFloat(document.getElementById("cfg-iqdb-sim").value),
       TRACEMOE_MIN_SIMILARITY: parseFloat(document.getElementById("cfg-trace-sim").value),
+      SAUCENAO_API_KEY: document.getElementById("cfg-saucenao-key") ? document.getElementById("cfg-saucenao-key").value : "",
+      SAUCENAO_MIN_SIMILARITY: document.getElementById("cfg-saucenao-sim") ? parseFloat(document.getElementById("cfg-saucenao-sim").value) : 65.0,
       MIN_DELAY_SECONDS: parseFloat(document.getElementById("cfg-min-delay").value),
       MAX_DELAY_SECONDS: parseFloat(document.getElementById("cfg-max-delay").value),
       TRIGGER_KEYWORDS: document.getElementById("cfg-triggers").value,

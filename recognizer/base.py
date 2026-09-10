@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional, List
 
 @dataclass
@@ -10,6 +10,9 @@ class CharacterInfo:
     series: Optional[str] = None
     confidence: float = 1.0
     source: str = "unknown"
+    # Nama-nama karakter alternatif dari engine (digunakan sebagai fallback klaim)
+    # Misalnya TraceMoe mengembalikan list karakter dari AniList, dan semua akan dicoba
+    alternate_names: List[str] = field(default_factory=list)
 
     def get_claim_names(self, mode: str = "full") -> List[str]:
         """

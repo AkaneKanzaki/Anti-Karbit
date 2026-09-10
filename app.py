@@ -404,6 +404,8 @@ class AntiKarbitApp:
         self.recognizer = get_recognizer(
             iqdb_min_sim=Config.IQDB_MIN_SIMILARITY,
             tracemoe_min_sim=Config.TRACEMOE_MIN_SIMILARITY,
+            saucenao_api_key=Config.SAUCENAO_API_KEY,
+            saucenao_min_sim=Config.SAUCENAO_MIN_SIMILARITY,
         )
 
         self.claimer = Claimer(
@@ -545,6 +547,9 @@ class AntiKarbitApp:
                 if self.recognizer and hasattr(self.recognizer, "iqdb"):
                     self.recognizer.iqdb.min_similarity = Config.IQDB_MIN_SIMILARITY
                     self.recognizer.tracemoe.min_similarity = Config.TRACEMOE_MIN_SIMILARITY
+                    if hasattr(self.recognizer, "saucenao"):
+                        self.recognizer.saucenao.api_key = Config.SAUCENAO_API_KEY
+                        self.recognizer.saucenao.min_similarity = Config.SAUCENAO_MIN_SIMILARITY
 
                 logger.info("Pengaturan bot berhasil diperbarui dari Web Dashboard.")
                 return web.json_response({"success": True, "config": Config.as_dict()})

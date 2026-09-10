@@ -1,5 +1,5 @@
 import logging
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List
 import aiohttp  # type: ignore
 
 logger = logging.getLogger("antikarbit.anilist")
@@ -20,6 +20,25 @@ query ($search: String) {
           english
         }
         type
+      }
+    }
+  }
+}
+"""
+
+_MEDIA_CHARACTERS_QUERY = """
+query ($id: Int) {
+  Media(id: $id) {
+    title {
+      romaji
+      english
+    }
+    characters(sort: [ROLE, RELEVANCE], perPage: 6) {
+      nodes {
+        name {
+          full
+          native
+        }
       }
     }
   }
@@ -83,3 +102,57 @@ async def lookup_series_from_character(char_name: str) -> Tuple[Optional[str], O
     except Exception as e:
         logger.debug(f"AniList lookup error untuk '{char_name}': {e}")
         return None, None
+
+
+async def lookup_characters_by_media_id(media_id: int) -> Tuple[Optional[str], List[str]]:
+    """
+    Mencari nama seri anime dan daftar karakter utama dari AniList berdasarkan media_id.
+    Mengembalikan (series_title, [character_names]).
+    """
+    try:
+        async with aiohttp.ClientSession() as session:
+            payload = {
+                "query": _MEDIA_CHARACTERS_QUERY,
+                "variables": {"id": media_id},
+            }
+            headers = {
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+                "User-Agent": (
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/120.0.0.0 Safari/537.36"
+                ),
+            }
+            async with session.post(
+                ANILIST_GRAPHQL,
+                json=payload,
+                headers=headers,
+                timeout=aiohttp.ClientTimeout(total=8),
+            ) as resp:
+                if resp.status != 200:
+                    logger.debug(f"AniList HTTP {resp.status} untuk media_id {media_id}")
+                    return None, []
+
+                data = await resp.json()
+
+        media = data.get("data", {}).get("Media")
+        if not media:
+            return None, []
+
+        title_obj = media.get("title", {})
+        series_name = title_obj.get("romaji") or title_obj.get("english") or "Anime"
+
+        char_nodes = media.get("characters", {}).get("nodes", [])
+        char_names = []
+        for node in char_nodes:
+            full = node.get("name", {}).get("full")
+            if full and full not in char_names:
+                char_names.append(full)
+
+        logger.info(f"AniList media {media_id} ({series_name}): ditemukan karakter {char_names}")
+        return series_name, char_names
+
+    except Exception as e:
+        logger.debug(f"AniList media lookup error untuk ID {media_id}: {e}")
+        return None, []

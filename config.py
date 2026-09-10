@@ -16,9 +16,12 @@ class Config:
     # Dashboard Security
     DASHBOARD_PASSWORD: str = os.getenv("DASHBOARD_PASSWORD", "")
 
-    # Reverse Image Search Settings (IQDB & Trace.moe - 0 API Key)
-    IQDB_MIN_SIMILARITY: float = float(os.getenv("IQDB_MIN_SIMILARITY", "40.0"))
-    TRACEMOE_MIN_SIMILARITY: float = float(os.getenv("TRACEMOE_MIN_SIMILARITY", "0.80"))
+    # Reverse Image Search Settings (IQDB, Trace.moe, SauceNAO & Google Lens)
+    IQDB_MIN_SIMILARITY: float = float(os.getenv("IQDB_MIN_SIMILARITY", "60.0"))
+    TRACEMOE_MIN_SIMILARITY: float = float(os.getenv("TRACEMOE_MIN_SIMILARITY", "0.85"))
+    SAUCENAO_API_KEY: str = os.getenv("SAUCENAO_API_KEY", "").strip()
+    SAUCENAO_MIN_SIMILARITY: float = float(os.getenv("SAUCENAO_MIN_SIMILARITY", "70.0"))
+    LENS_ENABLED: bool = os.getenv("LENS_ENABLED", "true").lower() not in ("false", "0", "no")
 
     # Claim Settings
     CLAIM_COMMAND: str = os.getenv("CLAIM_COMMAND", "/protecc")
@@ -78,6 +81,9 @@ class Config:
             "NAME_FORMAT": cls.NAME_FORMAT,
             "IQDB_MIN_SIMILARITY": cls.IQDB_MIN_SIMILARITY,
             "TRACEMOE_MIN_SIMILARITY": cls.TRACEMOE_MIN_SIMILARITY,
+            "SAUCENAO_API_KEY": cls.SAUCENAO_API_KEY,
+            "SAUCENAO_MIN_SIMILARITY": cls.SAUCENAO_MIN_SIMILARITY,
+            "LENS_ENABLED": cls.LENS_ENABLED,
             "TRIGGER_KEYWORDS": ", ".join(cls.TRIGGER_KEYWORDS),
             "TARGET_CHAT_IDS": ", ".join(map(str, cls.TARGET_CHAT_IDS)),
             "MIN_DELAY_SECONDS": cls.MIN_DELAY_SECONDS,
@@ -101,6 +107,13 @@ class Config:
                 cls.IQDB_MIN_SIMILARITY = float(new_settings["IQDB_MIN_SIMILARITY"])
             if "TRACEMOE_MIN_SIMILARITY" in new_settings:
                 cls.TRACEMOE_MIN_SIMILARITY = float(new_settings["TRACEMOE_MIN_SIMILARITY"])
+            if "SAUCENAO_API_KEY" in new_settings:
+                cls.SAUCENAO_API_KEY = str(new_settings["SAUCENAO_API_KEY"]).strip()
+            if "SAUCENAO_MIN_SIMILARITY" in new_settings:
+                cls.SAUCENAO_MIN_SIMILARITY = float(new_settings["SAUCENAO_MIN_SIMILARITY"])
+            if "LENS_ENABLED" in new_settings:
+                v = new_settings["LENS_ENABLED"]
+                cls.LENS_ENABLED = str(v).lower() not in ("false", "0", "no") if isinstance(v, str) else bool(v)
             if "TRIGGER_KEYWORDS" in new_settings:
                 raw = str(new_settings["TRIGGER_KEYWORDS"])
                 cls.TRIGGER_KEYWORDS = [k.strip() for k in raw.split(",") if k.strip()]
@@ -128,6 +141,9 @@ class Config:
                 "NAME_FORMAT": cls.NAME_FORMAT,
                 "IQDB_MIN_SIMILARITY": str(cls.IQDB_MIN_SIMILARITY),
                 "TRACEMOE_MIN_SIMILARITY": str(cls.TRACEMOE_MIN_SIMILARITY),
+                "SAUCENAO_API_KEY": cls.SAUCENAO_API_KEY,
+                "SAUCENAO_MIN_SIMILARITY": str(cls.SAUCENAO_MIN_SIMILARITY),
+                "LENS_ENABLED": str(cls.LENS_ENABLED).lower(),
                 "TRIGGER_KEYWORDS": ",".join(cls.TRIGGER_KEYWORDS),
                 "TARGET_CHAT_IDS": ",".join(map(str, cls.TARGET_CHAT_IDS)),
                 "MIN_DELAY_SECONDS": str(cls.MIN_DELAY_SECONDS),

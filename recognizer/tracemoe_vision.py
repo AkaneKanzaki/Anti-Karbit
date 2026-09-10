@@ -1,9 +1,10 @@
 import re
 import logging
-from typing import Optional
+from typing import Optional, List
 import aiohttp  # type: ignore
 
 from .base import BaseRecognizer, CharacterInfo
+from .anilist_lookup import lookup_characters_by_media_id
 
 logger = logging.getLogger("antikarbit.tracemoe")
 
@@ -11,11 +12,15 @@ logger = logging.getLogger("antikarbit.tracemoe")
 class TraceMoeRecognizer(BaseRecognizer):
     """
     Mencari asal adegan anime menggunakan Trace.moe API (https://trace.moe).
-    Sangat akurat untuk gambar berupa screenshot/frame langsung dari episode anime.
-    100% Gratis dan TANPA API KEY apapun.
+    Jika adegan ditemukan, resolusi nama karakter dilakukan secara otomatis melalui AniList GraphQL API
+    sehingga bot TIDAK PERNAH mengklaim judul anime sebagai nama karakter.
+    100% Gratis dan TANPA API KEY.
+
+    Mengembalikan beberapa kandidat karakter dari AniList sehingga listener dapat
+    mencoba satu-persatu jika yang pertama ditolak oleh game bot.
     """
 
-    def __init__(self, min_similarity: float = 0.80):
+    def __init__(self, min_similarity: float = 0.85):
         self.endpoint = "https://api.trace.moe/search?anilistInfo=1"
         self.min_similarity = min_similarity
 
@@ -60,12 +65,14 @@ class TraceMoeRecognizer(BaseRecognizer):
 
                     if similarity < self.min_similarity:
                         logger.info(
-                            f"Kecocokan Trace.moe ({similarity:.1%}) di bawah ambang {self.min_similarity:.0%}."
+                            f"Kecocokan Trace.moe ({similarity:.1%}) di bawah ambang batas {self.min_similarity:.0%}."
                         )
                         return None
 
                     anilist = top.get("anilist", {})
-                    title_obj = anilist.get("title", {})
+                    media_id = anilist.get("id") if isinstance(anilist, dict) else anilist
+
+                    title_obj = anilist.get("title", {}) if isinstance(anilist, dict) else {}
                     series_name = (
                         title_obj.get("romaji")
                         or title_obj.get("english")
@@ -74,23 +81,55 @@ class TraceMoeRecognizer(BaseRecognizer):
                     )
 
                     episode = top.get("episode")
-                    filename = top.get("filename", "")
+                    clean_series = re.sub(r"\s*\(TV\)\s*", "", series_name)
 
                     logger.info(
-                        f"Trace.moe Menemukan Adegan: '{series_name}' "
+                        f"Trace.moe Menemukan Adegan: '{clean_series}' "
                         f"(Episode: {episode}, Kemiripan: {similarity:.1%})"
                     )
 
-                    # Bersihkan nama seri untuk kandidat
-                    clean_series = re.sub(r"\s*\(TV\)\s*", "", series_name)
+                    # Resolusi karakter anime dari AniList — ambil SEMUA kandidat
+                    char_candidates: List[str] = []
+                    if media_id and isinstance(media_id, int):
+                        logger.info(f"Mencari karakter dari anime '{clean_series}' (ID: {media_id})...")
+                        _, char_candidates = await lookup_characters_by_media_id(media_id)
+                        if char_candidates:
+                            logger.info(
+                                f"AniList mengembalikan {len(char_candidates)} karakter: "
+                                f"{', '.join(char_candidates[:3])}{'...' if len(char_candidates) > 3 else ''}"
+                            )
+
+                    if not char_candidates:
+                        logger.warning(
+                            f"Adegan anime '{clean_series}' ditemukan di Trace.moe, namun nama karakter "
+                            "spesifik tidak dapat dipastikan. Membatalkan klaim agar tidak salah menyebut judul anime."
+                        )
+                        return None
+
+                    # Gunakan karakter pertama sebagai primary, sisanya sebagai alternates
+                    primary_char = char_candidates[0]
+                    alternate_chars = char_candidates[1:]
+
+                    parts = primary_char.split()
+                    if len(parts) >= 2:
+                        first_name = parts[-1]
+                        last_name = " ".join(parts[:-1])
+                    else:
+                        first_name = primary_char
+                        last_name = None
+
+                    logger.info(f"Karakter utama Trace.moe: '{primary_char}'")
+                    if alternate_chars:
+                        logger.info(f"Kandidat alternatif: {alternate_chars}")
 
                     return CharacterInfo(
-                        full_name=clean_series,
-                        first_name=clean_series.split()[0] if clean_series else clean_series,
-                        last_name=None,
+                        full_name=primary_char,
+                        first_name=first_name,
+                        last_name=last_name,
                         series=clean_series,
                         confidence=similarity,
                         source="trace_moe",
+                        alternate_names=alternate_chars,
                     )
 
         except Exception as e:
