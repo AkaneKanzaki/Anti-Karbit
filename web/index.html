@@ -4,9 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AntiKarbit — Waifu Claimer Dashboard</title>
+  <meta name="description" content="Dashboard monitoring dan kontrol bot otomatis AntiKarbit Waifu Claimer">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
@@ -15,7 +16,7 @@
   <div class="login-overlay" id="login-overlay" style="display: none;">
     <div class="login-card">
       <div class="login-logo">⚡</div>
-      <h2 class="login-title">AntiKarbit</h2>
+      <h1 class="login-title">AntiKarbit</h1>
       <p class="login-subtitle">Masukkan password untuk mengakses Dashboard</p>
 
       <form id="login-form" autocomplete="off">
@@ -31,24 +32,24 @@
         </div>
         <div class="login-error" id="login-error-msg"></div>
         <button type="submit" class="btn btn-primary w-full" id="btn-login">
-          <span id="btn-login-label">🔓 Masuk ke Dashboard</span>
+          <span id="btn-login-label">Masuk ke Dashboard</span>
         </button>
       </form>
-
-      <p class="login-hint">
-        Atur <code>DASHBOARD_PASSWORD</code> di variabel lingkungan / Railway untuk mengaktifkan proteksi ini.
-      </p>
     </div>
   </div>
 
+  <!-- ===== SIDEBAR OVERLAY (mobile tap-to-close) ===== -->
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
   <div class="app-container" id="app-container" style="display: none;">
-    <!-- Sidebar Navigation -->
-    <aside class="sidebar">
+
+    <!-- ===== SIDEBAR ===== -->
+    <aside class="sidebar" id="sidebar">
       <div class="brand">
         <div class="brand-icon">⚡</div>
         <div class="brand-text">
           <span class="brand-title">AntiKarbit</span>
-          <span class="brand-subtitle">Waifu Claimer Bot</span>
+          <span class="brand-subtitle">Waifu Claimer</span>
         </div>
       </div>
 
@@ -65,9 +66,7 @@
 
         <button class="nav-item" data-tab="tester" id="nav-tester">
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
-            <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
-            <line x1="12" y1="22.08" x2="12" y2="12"></line>
+            <path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18"></path>
           </svg>
           <span>Waifu Tester</span>
         </button>
@@ -95,22 +94,38 @@
           <span class="stat-value" id="sys-ram">-- MB</span>
         </div>
         <div class="system-stat">
-          <span class="stat-label">Engine Vision</span>
+          <span class="stat-label">Vision Engine</span>
           <span class="stat-badge">IQDB + Trace</span>
         </div>
         <button class="btn-logout" id="btn-logout" style="display: none;" title="Keluar dari Dashboard">
-          🚪 Logout
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+            <polyline points="16 17 21 12 16 7"></polyline>
+            <line x1="21" y1="12" x2="9" y2="12"></line>
+          </svg>
+          Logout
         </button>
       </div>
     </aside>
 
-    <!-- Main Content Area -->
+    <!-- ===== MAIN CONTENT ===== -->
     <main class="main-content">
+
       <!-- Top Header -->
       <header class="top-header">
         <div class="header-left">
-          <h1 class="page-title" id="current-tab-title">Dashboard Overview</h1>
-          <p class="page-desc" id="current-tab-desc">Monitor performa klaim otomatis & aktivitas grup</p>
+          <!-- Hamburger button (mobile) -->
+          <button class="btn-hamburger" id="btn-hamburger" title="Buka menu navigasi" aria-label="Toggle sidebar">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+          </button>
+          <div>
+            <h2 class="page-title" id="current-tab-title">Dashboard Overview</h2>
+            <p class="page-desc" id="current-tab-desc">Monitor performa klaim otomatis &amp; aktivitas grup</p>
+          </div>
         </div>
 
         <div class="header-right">
@@ -127,7 +142,7 @@
             <span class="status-label" id="status-text">Memeriksa...</span>
           </div>
 
-          <button class="btn-toggle-bot" id="btn-toggle-bot" title="Nyalakan/Matikan Pendengar Bot">
+          <button class="btn-toggle-bot" id="btn-toggle-bot" title="Nyalakan/Matikan Bot">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
               <path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path>
               <line x1="12" y1="2" x2="12" y2="12"></line>
@@ -137,320 +152,359 @@
         </div>
       </header>
 
-      <!-- TAB 1: DASHBOARD -->
-      <section class="tab-pane active" id="pane-dashboard">
-        <!-- Stat Cards Row -->
-        <div class="stat-grid">
-          <div class="stat-card">
-            <div class="stat-icon purple">🎯</div>
-            <div class="stat-data">
-              <span class="stat-num" id="stat-detected">0</span>
-              <span class="stat-title">Waifu Terdeteksi</span>
+      <!-- Tab Content -->
+      <div class="tab-content">
+
+        <!-- TAB 1: DASHBOARD -->
+        <section class="tab-pane active" id="pane-dashboard">
+          <!-- Stat Cards -->
+          <div class="stat-grid">
+            <div class="stat-card">
+              <div class="stat-icon purple">🎯</div>
+              <div class="stat-data">
+                <span class="stat-num" id="stat-detected">0</span>
+                <span class="stat-title">Waifu Terdeteksi</span>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon green">✨</div>
+              <div class="stat-data">
+                <span class="stat-num" id="stat-claimed">0</span>
+                <span class="stat-title">Berhasil Diklaim</span>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon red">⚠️</div>
+              <div class="stat-data">
+                <span class="stat-num" id="stat-failed">0</span>
+                <span class="stat-title">Klaim Gagal/Lewat</span>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon blue">⚡</div>
+              <div class="stat-data">
+                <span class="stat-num" id="stat-success-rate">100%</span>
+                <span class="stat-title">Tingkat Akurasi</span>
+              </div>
             </div>
           </div>
 
-          <div class="stat-card">
-            <div class="stat-icon green">✨</div>
-            <div class="stat-data">
-              <span class="stat-num" id="stat-claimed">0</span>
-              <span class="stat-title">Berhasil Diklaim</span>
-            </div>
-          </div>
+          <!-- Dashboard Grid: Feed + Config Summary -->
+          <div class="dashboard-grid">
 
-          <div class="stat-card">
-            <div class="stat-icon red">⚠️</div>
-            <div class="stat-data">
-              <span class="stat-num" id="stat-failed">0</span>
-              <span class="stat-title">Klaim Gagal/Lewat</span>
-            </div>
-          </div>
+            <!-- Recent Claims Feed -->
+            <div class="panel feed-panel">
+              <div class="panel-header">
+                <div class="panel-title-wrap">
+                  <span class="panel-icon">📋</span>
+                  <h3 class="panel-title">Riwayat Deteksi &amp; Klaim Terbaru</h3>
+                </div>
+                <span class="badge" id="feed-count">0 items</span>
+              </div>
 
-          <div class="stat-card">
-            <div class="stat-icon blue">⚡</div>
-            <div class="stat-data">
-              <span class="stat-num" id="stat-success-rate">100%</span>
-              <span class="stat-title">Tingkat Akurasi</span>
+              <div class="feed-list" id="feed-list">
+                <div class="empty-state" id="feed-empty">
+                  <div class="empty-icon">🌸</div>
+                  <p class="empty-text">Belum ada waifu yang muncul di grup.</p>
+                  <span class="empty-sub">Bot sedang mendengarkan pesan secara real-time.</span>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
 
-        <!-- Live Feed & Active Config Grid -->
-        <div class="dashboard-grid">
-          <!-- Recent Claims Feed -->
-          <div class="panel feed-panel">
+            <!-- Config Summary -->
+            <div class="panel info-panel">
+              <div class="panel-header">
+                <div class="panel-title-wrap">
+                  <span class="panel-icon">⚙️</span>
+                  <h3 class="panel-title">Konfigurasi Aktif</h3>
+                </div>
+              </div>
+
+              <div class="config-summary-list">
+                <div class="summary-item">
+                  <span class="summary-label">Perintah Klaim</span>
+                  <span class="summary-val code-val" id="summary-cmd">/protecc</span>
+                </div>
+                <div class="summary-item">
+                  <span class="summary-label">Format Nama</span>
+                  <span class="summary-val badge-val" id="summary-fmt">full</span>
+                </div>
+                <div class="summary-item">
+                  <span class="summary-label">Ambang IQDB</span>
+                  <span class="summary-val" id="summary-iqdb">40%</span>
+                </div>
+                <div class="summary-item">
+                  <span class="summary-label">Ambang Trace.moe</span>
+                  <span class="summary-val" id="summary-tracemoe">80%</span>
+                </div>
+                <div class="summary-item">
+                  <span class="summary-label">Kata Kunci Pemicu</span>
+                  <span class="summary-val tags-val" id="summary-triggers">A waifu has appeared!...</span>
+                </div>
+              </div>
+
+              <div class="info-footer">
+                <button class="btn btn-secondary w-full" id="btn-goto-settings">
+                  Ubah Pengaturan →
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </section>
+
+        <!-- TAB 2: WAIFU TESTER -->
+        <section class="tab-pane" id="pane-tester">
+          <div class="tester-layout">
+
+            <!-- Upload Panel -->
+            <div class="panel upload-panel">
+              <div class="panel-header">
+                <div class="panel-title-wrap">
+                  <span class="panel-icon">🖼️</span>
+                  <h3 class="panel-title">Uji Deteksi Gambar</h3>
+                </div>
+              </div>
+              <p class="panel-desc">
+                Unggah gambar waifu untuk menguji pengenalan karakter. Gambar hanya diproses di RAM (in-memory) dan langsung dibuang — tidak disimpan ke disk.
+              </p>
+
+              <div class="panel-body">
+                <div class="dropzone" id="test-dropzone">
+                  <input type="file" id="test-file-input" accept="image/png,image/jpeg,image/webp" hidden>
+                  <div class="dropzone-inner" id="dropzone-content">
+                    <div class="dropzone-icon">📥</div>
+                    <h4 class="dropzone-title">Klik atau Seret Gambar ke Sini</h4>
+                    <p class="dropzone-subtitle">JPG, PNG, WEBP — Maks 8 MB</p>
+                    <button class="btn btn-secondary btn-sm" id="btn-browse-file" type="button">Pilih File</button>
+                  </div>
+                  <div class="dropzone-preview" id="dropzone-preview" style="display: none;">
+                    <img id="preview-img" alt="Pratinjau Gambar">
+                    <button class="btn-clear-preview" id="btn-clear-preview" title="Ganti gambar">✕</button>
+                  </div>
+                </div>
+
+                <button class="btn btn-accent w-full mt-4" id="btn-run-test" disabled>
+                  <span>🔍 Mulai Identifikasi</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Result Panel -->
+            <div class="panel result-panel">
+              <div class="panel-header">
+                <div class="panel-title-wrap">
+                  <span class="panel-icon">✨</span>
+                  <h3 class="panel-title">Hasil Analisis Vision</h3>
+                </div>
+                <span class="badge" id="test-status-badge">Menunggu Gambar</span>
+              </div>
+
+              <div class="result-placeholder" id="test-placeholder">
+                <div class="placeholder-icon">🔬</div>
+                <p>Unggah gambar di samping dan klik <strong>Mulai Identifikasi</strong> untuk melihat hasil nama karakter, seri anime, dan simulasi perintah klaim.</p>
+              </div>
+
+              <div class="result-content" id="test-result-card" style="display: none;">
+                <div class="result-hero">
+                  <div class="hero-name" id="res-fullname">--</div>
+                  <div class="hero-series" id="res-series">--</div>
+                </div>
+
+                <div class="result-details-grid">
+                  <div class="detail-box">
+                    <span class="detail-label">Nama Depan</span>
+                    <span class="detail-val" id="res-firstname">--</span>
+                  </div>
+                  <div class="detail-box">
+                    <span class="detail-label">Nama Belakang</span>
+                    <span class="detail-val" id="res-lastname">--</span>
+                  </div>
+                  <div class="detail-box">
+                    <span class="detail-label">Kemiripan</span>
+                    <span class="detail-val highlight" id="res-confidence">--%</span>
+                  </div>
+                  <div class="detail-box">
+                    <span class="detail-label">Mesin Pencari</span>
+                    <span class="detail-val" id="res-engine">--</span>
+                  </div>
+                </div>
+
+                <div class="claim-commands-preview">
+                  <span class="commands-label">Simulasi Perintah Klaim:</span>
+                  <div class="cmd-snippet">
+                    <span class="cmd-tag">Format Saat Ini</span>
+                    <code id="res-cmd-current">/protecc Name</code>
+                  </div>
+                  <div class="cmd-snippet alt">
+                    <span class="cmd-tag">Retry Fallback</span>
+                    <code id="res-cmd-fallbacks">--</code>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </section>
+
+        <!-- TAB 3: LIVE CONSOLE -->
+        <section class="tab-pane" id="pane-logs">
+          <div class="panel console-panel">
             <div class="panel-header">
               <div class="panel-title-wrap">
-                <span class="panel-icon">📋</span>
-                <h2 class="panel-title">Riwayat Deteksi & Klaim Terbaru</h2>
+                <span class="panel-icon">💻</span>
+                <h3 class="panel-title">Terminal Console Log</h3>
               </div>
-              <span class="badge" id="feed-count">0 items</span>
+              <div class="console-actions">
+                <select id="sel-log-filter" class="console-filter-select" title="Filter level log">
+                  <option value="all">Semua Log</option>
+                  <option value="success">Sukses &amp; Klaim</option>
+                  <option value="warning">Peringatan &amp; Error</option>
+                </select>
+                <label class="toggle-wrap">
+                  <input type="checkbox" id="chk-autoscroll" checked>
+                  <span>Auto Scroll</span>
+                </label>
+                <button class="btn btn-sm btn-secondary" id="btn-clear-logs">Bersihkan</button>
+              </div>
             </div>
 
-            <div class="feed-list" id="feed-list">
-              <div class="empty-state" id="feed-empty">
-                <div class="empty-icon">🌸</div>
-                <p class="empty-text">Belum ada kemunculan waifu di grup.</p>
-                <span class="empty-sub">Bot sedang mendengarkan pesan masuk secara real-time.</span>
-              </div>
+            <div class="console-box" id="console-output">
+              <div class="log-line system">[SISTEM] Menghubungkan ke stream log server...</div>
             </div>
           </div>
+        </section>
 
-          <!-- Quick Config / Bot Info Panel -->
-          <div class="panel info-panel">
+        <!-- TAB 4: SETTINGS -->
+        <section class="tab-pane" id="pane-settings">
+          <div class="panel settings-panel">
             <div class="panel-header">
               <div class="panel-title-wrap">
                 <span class="panel-icon">⚙️</span>
-                <h2 class="panel-title">Ringkasan Konfigurasi</h2>
-              </div>
-            </div>
-
-            <div class="config-summary-list">
-              <div class="summary-item">
-                <span class="summary-label">Perintah Klaim</span>
-                <span class="summary-val code-val" id="summary-cmd">/protecc</span>
-              </div>
-              <div class="summary-item">
-                <span class="summary-label">Format Nama</span>
-                <span class="summary-val badge-val" id="summary-fmt">full</span>
-              </div>
-              <div class="summary-item">
-                <span class="summary-label">Ambang IQDB</span>
-                <span class="summary-val" id="summary-iqdb">40.0%</span>
-              </div>
-              <div class="summary-item">
-                <span class="summary-label">Ambang Trace.moe</span>
-                <span class="summary-val" id="summary-tracemoe">80.0%</span>
-              </div>
-              <div class="summary-item">
-                <span class="summary-label">Kata Kunci Pemicu</span>
-                <span class="summary-val tags-val" id="summary-triggers">A waifu has appeared!...</span>
-              </div>
-            </div>
-
-            <div class="info-footer">
-              <button class="btn btn-secondary w-full" id="btn-goto-settings">
-                Ubah Pengaturan Lengkap →
-              </button>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- TAB 2: WAIFU TESTER -->
-      <section class="tab-pane" id="pane-tester">
-        <div class="tester-layout">
-          <div class="panel upload-panel">
-            <div class="panel-header">
-              <div class="panel-title-wrap">
-                <span class="panel-icon">🖼️</span>
-                <h2 class="panel-title">Uji Deteksi Gambar Waifu</h2>
+                <h3 class="panel-title">Konfigurasi Klaim &amp; Pengenalan</h3>
               </div>
             </div>
             <p class="panel-desc">
-              Tarik & jatuhkan (drag & drop) gambar waifu atau pilih file untuk menguji pengenalan karakter. Gambar hanya diproses secara in-memory (RAM) dan langsung dibuang otomatis tanpa disimpan ke disk server.
+              Pengaturan disimpan langsung ke <code>.env</code> dan aktif tanpa perlu restart aplikasi.
             </p>
 
-            <div class="dropzone" id="test-dropzone">
-              <input type="file" id="test-file-input" accept="image/png,image/jpeg,image/webp" hidden>
-              <div class="dropzone-inner" id="dropzone-content">
-                <div class="dropzone-icon">📥</div>
-                <h3 class="dropzone-title">Klik atau Seret Gambar ke Sini</h3>
-                <p class="dropzone-subtitle">Mendukung format JPG, PNG, WEBP (Maks 8 MB)</p>
-                <button class="btn btn-primary" id="btn-browse-file" type="button">Pilih Gambar</button>
-              </div>
-              <div class="dropzone-preview" id="dropzone-preview" style="display: none;">
-                <img id="preview-img" alt="Pratinjau Waifu">
-                <button class="btn-clear-preview" id="btn-clear-preview" title="Ganti gambar">✕</button>
-              </div>
-            </div>
+            <form id="form-settings" novalidate>
 
-            <button class="btn btn-accent w-full mt-4" id="btn-run-test" disabled>
-              <span>🔍 Mulai Identifikasi Gambar</span>
-            </button>
+              <!-- Section: Perintah Bot -->
+              <div class="form-section">
+                <p class="form-section-title">Perintah &amp; Format Klaim</p>
+                <div class="form-grid">
+                  <div class="form-group">
+                    <label for="cfg-claim-cmd">Perintah Klaim Bot</label>
+                    <input type="text" id="cfg-claim-cmd" name="CLAIM_COMMAND" class="form-control" placeholder="/protecc">
+                    <small class="form-hint">Contoh: <code>/protecc</code>, <code>$claim</code>, atau <code>.c</code></small>
+                  </div>
+
+                  <div class="form-group">
+                    <label for="cfg-name-fmt">Format Nama yang Diklaim</label>
+                    <select id="cfg-name-fmt" name="NAME_FORMAT" class="form-control">
+                      <option value="full">Nama Lengkap (Houraisan Kaguya)</option>
+                      <option value="first">Nama Depan Saja (Kaguya)</option>
+                      <option value="both">Keduanya (Depan lalu Lengkap)</option>
+                    </select>
+                    <small class="form-hint">Disarankan <code>full</code> dengan auto-retry jika ditolak.</small>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Section: Ambang Kemiripan -->
+              <div class="form-section">
+                <p class="form-section-title">Ambang Kemiripan Vision</p>
+                <div class="form-grid">
+                  <div class="form-group">
+                    <label for="cfg-iqdb-sim">Kemiripan IQDB (%)</label>
+                    <input type="number" id="cfg-iqdb-sim" name="IQDB_MIN_SIMILARITY" class="form-control" min="20" max="100" step="1">
+                    <small class="form-hint">Rekomendasi: <strong>60%</strong> (Danbooru/Gelbooru)</small>
+                  </div>
+
+                  <div class="form-group">
+                    <label for="cfg-trace-sim">Kemiripan Trace.moe (%)</label>
+                    <input type="number" id="cfg-trace-sim" name="TRACEMOE_MIN_SIMILARITY" class="form-control" min="40" max="100" step="1">
+                    <small class="form-hint">Rekomendasi: <strong>85%</strong> (Adegan Anime)</small>
+                  </div>
+
+                  <div class="form-group">
+                    <label for="cfg-saucenao-sim">Kemiripan SauceNAO (%)</label>
+                    <input type="number" id="cfg-saucenao-sim" name="SAUCENAO_MIN_SIMILARITY" class="form-control" min="40" max="100" step="1">
+                    <small class="form-hint">Rekomendasi: <strong>70%</strong></small>
+                  </div>
+
+                  <div class="form-group">
+                    <label for="cfg-saucenao-key">SauceNAO API Key <span style="font-weight:400;color:var(--text-subtle)">(Opsional)</span></label>
+                    <input type="password" id="cfg-saucenao-key" name="SAUCENAO_API_KEY" class="form-control" placeholder="Daftar gratis di saucenao.com">
+                    <small class="form-hint">Meningkatkan akurasi untuk fanart Pixiv/Twitter.</small>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Section: Waktu & Kecepatan -->
+              <div class="form-section">
+                <p class="form-section-title">Pengaturan Waktu &amp; Kecepatan</p>
+                <div class="form-grid">
+                  <div class="form-group">
+                    <label for="cfg-min-delay">Jeda Minimum (Detik)</label>
+                    <input type="number" id="cfg-min-delay" name="MIN_DELAY_SECONDS" class="form-control" min="0.1" max="10" step="0.1">
+                    <small class="form-hint">Jeda sebelum mengirim klaim agar menyerupai manusia.</small>
+                  </div>
+
+                  <div class="form-group">
+                    <label for="cfg-max-delay">Jeda Maksimum (Detik)</label>
+                    <input type="number" id="cfg-max-delay" name="MAX_DELAY_SECONDS" class="form-control" min="0.1" max="10" step="0.1">
+                  </div>
+                </div>
+              </div>
+
+              <!-- Section: Fitur Lanjutan -->
+              <div class="form-section">
+                <p class="form-section-title">Fitur Lanjutan</p>
+                <div class="form-grid">
+
+                  <div class="form-group full-width">
+                    <div class="toggle-field">
+                      <label class="toggle-switch">
+                        <input type="checkbox" id="cfg-lens-enabled" name="LENS_ENABLED">
+                        <span class="toggle-slider"></span>
+                      </label>
+                      <div class="toggle-text">
+                        <span class="toggle-label" for="cfg-lens-enabled">Aktifkan Fallback Google Lens</span>
+                        <small class="form-hint">Lapis ke-4 jika IQDB, SauceNAO, dan Trace.moe gagal. Wajib lolos verifikasi AniList untuk mencegah false claim.</small>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="form-group full-width">
+                    <label for="cfg-triggers">Kata Kunci Pemicu Waifu <span style="font-weight:400;color:var(--text-subtle)">(Pisahkan dengan koma)</span></label>
+                    <textarea id="cfg-triggers" name="TRIGGER_KEYWORDS" class="form-control" rows="2" placeholder="A waifu has appeared!, Add her to your harem"></textarea>
+                    <small class="form-hint">Bot akan memproses gambar jika pesan memuat salah satu teks ini.</small>
+                  </div>
+
+                  <div class="form-group full-width">
+                    <label for="cfg-target-chats">Target Chat ID Grup <span style="font-weight:400;color:var(--text-subtle)">(Kosongkan untuk semua grup)</span></label>
+                    <input type="text" id="cfg-target-chats" name="TARGET_CHAT_IDS" class="form-control" placeholder="-100123456789, -100987654321">
+                    <small class="form-hint">Pisahkan dengan koma. Kosongkan jika ingin bot aktif di semua grup.</small>
+                  </div>
+
+                </div>
+              </div>
+
+              <div class="form-actions">
+                <button type="submit" class="btn btn-primary" id="btn-save-settings">
+                  💾 Simpan Konfigurasi
+                </button>
+                <span class="save-status" id="save-status-msg"></span>
+              </div>
+            </form>
           </div>
+        </section>
 
-          <!-- Result Panel -->
-          <div class="panel result-panel">
-            <div class="panel-header">
-              <div class="panel-title-wrap">
-                <span class="panel-icon">✨</span>
-                <h2 class="panel-title">Hasil Analisis Vision</h2>
-              </div>
-              <span class="badge" id="test-status-badge">Menunggu Gambar</span>
-            </div>
-
-            <div class="result-placeholder" id="test-placeholder">
-              <div class="placeholder-icon">🔬</div>
-              <p>Unggah gambar di samping dan klik <strong>Mulai Identifikasi</strong> untuk melihat hasil ekstraksi nama karakter, seri anime, dan perintah klaim.</p>
-            </div>
-
-            <div class="result-content" id="test-result-card" style="display: none;">
-              <div class="result-hero">
-                <div class="hero-name" id="res-fullname">--</div>
-                <div class="hero-series" id="res-series">--</div>
-              </div>
-
-              <div class="result-details-grid">
-                <div class="detail-box">
-                  <span class="detail-label">Nama Depan (First)</span>
-                  <span class="detail-val" id="res-firstname">--</span>
-                </div>
-                <div class="detail-box">
-                  <span class="detail-label">Nama Belakang (Last)</span>
-                  <span class="detail-val" id="res-lastname">--</span>
-                </div>
-                <div class="detail-box">
-                  <span class="detail-label">Tingkat Kemiripan</span>
-                  <span class="detail-val highlight" id="res-confidence">--%</span>
-                </div>
-                <div class="detail-box">
-                  <span class="detail-label">Mesin Pencari</span>
-                  <span class="detail-val" id="res-engine">--</span>
-                </div>
-              </div>
-
-              <div class="claim-commands-preview">
-                <span class="commands-label">Simulasi Perintah Klaim Otomatis:</span>
-                <div class="cmd-snippet">
-                  <span class="cmd-tag">Format Saat Ini</span>
-                  <code id="res-cmd-current">/protecc Name</code>
-                </div>
-                <div class="cmd-snippet alt">
-                  <span class="cmd-tag">Kandidat Retry Fallback</span>
-                  <code id="res-cmd-fallbacks">--</code>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- TAB 3: LIVE CONSOLE -->
-      <section class="tab-pane" id="pane-logs">
-        <div class="panel console-panel">
-          <div class="panel-header">
-            <div class="panel-title-wrap">
-              <span class="panel-icon">💻</span>
-              <h2 class="panel-title">Terminal Console Log (Real-time)</h2>
-            </div>
-            <div class="console-actions">
-              <select id="sel-log-filter" class="console-filter-select" title="Filter level log">
-                <option value="all">🔍 Semua Log</option>
-                <option value="success">🎉 Hanya Sukses & Klaim</option>
-                <option value="warning">⚠️ Peringatan & Error</option>
-              </select>
-              <label class="toggle-wrap">
-                <input type="checkbox" id="chk-autoscroll" checked>
-                <span>Auto Scroll</span>
-              </label>
-              <button class="btn btn-sm btn-secondary" id="btn-clear-logs">Bersihkan Tampilan</button>
-            </div>
-          </div>
-
-          <div class="console-box" id="console-output">
-            <div class="log-line system">[SISTEM] Menghubungkan ke stream log server...</div>
-          </div>
-        </div>
-      </section>
-
-      <!-- TAB 4: SETTINGS -->
-      <section class="tab-pane" id="pane-settings">
-        <div class="panel settings-panel">
-          <div class="panel-header">
-            <div class="panel-title-wrap">
-              <span class="panel-icon">⚙️</span>
-              <h2 class="panel-title">Konfigurasi Klaim & Pengenalan</h2>
-            </div>
-          </div>
-          <p class="panel-desc">
-            Pengaturan di bawah ini disimpan langsung ke file <code>.env</code> dan langsung aktif tanpa perlu mematikan aplikasi.
-          </p>
-
-          <form id="form-settings" novalidate>
-            <div class="form-grid">
-              <div class="form-group">
-                <label for="cfg-claim-cmd">Perintah Klaim Bot</label>
-                <input type="text" id="cfg-claim-cmd" name="CLAIM_COMMAND" class="form-control" placeholder="/protecc">
-                <small class="form-hint">Contoh: <code>/protecc</code>, <code>$claim</code>, atau <code>.c</code></small>
-              </div>
-
-              <div class="form-group">
-                <label for="cfg-name-fmt">Format Nama yang Diklaim</label>
-                <select id="cfg-name-fmt" name="NAME_FORMAT" class="form-control">
-                  <option value="full">Nama Lengkap (Contoh: Houraisan Kaguya)</option>
-                  <option value="first">Nama Depan Saja (Contoh: Kaguya)</option>
-                  <option value="both">Keduanya (Nama Depan lalu Nama Lengkap)</option>
-                </select>
-                <small class="form-hint">Disarankan <code>full</code> dengan fitur auto-retry otomatis jika ditolak bot.</small>
-              </div>
-
-              <div class="form-group">
-                <label for="cfg-iqdb-sim">Ambang Kemiripan IQDB (%)</label>
-                <input type="number" id="cfg-iqdb-sim" name="IQDB_MIN_SIMILARITY" class="form-control" min="20" max="100" step="1">
-                <small class="form-hint">Nilai rekomendasi: <strong>60%</strong> (Danbooru/Gelbooru)</small>
-              </div>
-
-              <div class="form-group">
-                <label for="cfg-trace-sim">Ambang Kemiripan Trace.moe (%)</label>
-                <input type="number" id="cfg-trace-sim" name="TRACEMOE_MIN_SIMILARITY" class="form-control" min="40" max="100" step="1">
-                <small class="form-hint">Nilai rekomendasi: <strong>85%</strong> (Adegan Anime)</small>
-              </div>
-
-              <div class="form-group">
-                <label for="cfg-saucenao-key">SauceNAO API Key (Opsional)</label>
-                <input type="password" id="cfg-saucenao-key" name="SAUCENAO_API_KEY" class="form-control" placeholder="Daftar gratis di saucenao.com">
-                <small class="form-hint">Mencari fanart Pixiv/Twitter/Danbooru. Sangat disarankan diisi.</small>
-              </div>
-
-              <div class="form-group">
-                <label for="cfg-saucenao-sim">Ambang Kemiripan SauceNAO (%)</label>
-                <input type="number" id="cfg-saucenao-sim" name="SAUCENAO_MIN_SIMILARITY" class="form-control" min="40" max="100" step="1">
-                <small class="form-hint">Nilai rekomendasi: <strong>70%</strong></small>
-              </div>
-
-              <div class="form-group">
-                <label for="cfg-min-delay">Jeda Minimum (Detik)</label>
-                <input type="number" id="cfg-min-delay" name="MIN_DELAY_SECONDS" class="form-control" min="0.1" max="10" step="0.1">
-                <small class="form-hint">Jeda sebelum mengetik klaim agar menyerupai manusia.</small>
-              </div>
-
-              <div class="form-group">
-                <label for="cfg-max-delay">Jeda Maksimum (Detik)</label>
-                <input type="number" id="cfg-max-delay" name="MAX_DELAY_SECONDS" class="form-control" min="0.1" max="10" step="0.1">
-              </div>
-
-              <div class="form-group full-width">
-                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-weight: 600;">
-                  <input type="checkbox" id="cfg-lens-enabled" name="LENS_ENABLED" style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--accent);">
-                  <span>🌐 Aktifkan Fallback Google Lens (Pencarian Web Visual)</span>
-                </label>
-                <small class="form-hint">Sebagai lapis ke-4 jika IQDB, SauceNAO, dan Trace.moe tidak menemukan hasil. Wajib lolos verifikasi AniList untuk mencegah false claim.</small>
-              </div>
-
-              <div class="form-group full-width">
-                <label for="cfg-triggers">Kata Kunci Pemicu Munculnya Waifu (Pisahkan Koma)</label>
-                <textarea id="cfg-triggers" name="TRIGGER_KEYWORDS" class="form-control" rows="2" placeholder="A waifu has appeared!, Add her to your harem"></textarea>
-                <small class="form-hint">Bot akan mendownload gambar jika pesan memuat salah satu teks di atas.</small>
-              </div>
-
-              <div class="form-group full-width">
-                <label for="cfg-target-chats">Target Chat ID Grup (Pisahkan Koma, Kosongkan untuk Semua Grup)</label>
-                <input type="text" id="cfg-target-chats" name="TARGET_CHAT_IDS" class="form-control" placeholder="Contoh: -100123456789, -100987654321">
-                <small class="form-hint">Kosongkan jika ingin bot aktif di semua grup Telegram tempat Anda berada.</small>
-              </div>
-            </div>
-
-            <div class="form-actions">
-              <button type="submit" class="btn btn-primary" id="btn-save-settings">
-                💾 Simpan Konfigurasi
-              </button>
-              <span class="save-status" id="save-status-msg"></span>
-            </div>
-          </form>
-        </div>
-      </section>
+      </div><!-- /.tab-content -->
     </main>
-  </div>
+  </div><!-- /.app-container -->
 
   <script src="/app.js"></script>
 </body>

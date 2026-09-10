@@ -84,7 +84,7 @@ if (loginForm) {
     } catch (err) {
       showLoginError("Gagal menghubungi server. Coba lagi.");
     } finally {
-      btnLoginLabel.textContent = "🔓 Masuk ke Dashboard";
+      btnLoginLabel.textContent = "Masuk ke Dashboard";
     }
   });
 }
@@ -114,6 +114,52 @@ if (btnLogout) {
 })();
 
 document.addEventListener("DOMContentLoaded", () => {
+
+  // ==========================================
+  // 0. Mobile Sidebar Toggle (Hamburger Menu)
+  // ==========================================
+  const sidebar       = document.getElementById("sidebar");
+  const sidebarOvl    = document.getElementById("sidebar-overlay");
+  const btnHamburger  = document.getElementById("btn-hamburger");
+
+  function openSidebar() {
+    if (sidebar)    sidebar.classList.add("open");
+    if (sidebarOvl) sidebarOvl.classList.add("visible");
+    document.body.style.overflow = "hidden";
+  }
+
+  function closeSidebar() {
+    if (sidebar)    sidebar.classList.remove("open");
+    if (sidebarOvl) sidebarOvl.classList.remove("visible");
+    document.body.style.overflow = "";
+  }
+
+  if (btnHamburger) {
+    btnHamburger.addEventListener("click", () => {
+      if (sidebar && sidebar.classList.contains("open")) {
+        closeSidebar();
+      } else {
+        openSidebar();
+      }
+    });
+  }
+
+  if (sidebarOvl) {
+    sidebarOvl.addEventListener("click", closeSidebar);
+  }
+
+  // Auto-close sidebar on nav item click (mobile)
+  document.querySelectorAll(".nav-item").forEach(btn => {
+    btn.addEventListener("click", () => {
+      if (window.innerWidth <= 768) closeSidebar();
+    });
+  });
+
+  // Close sidebar when resizing to desktop
+  window.addEventListener("resize", () => {
+    if (window.innerWidth > 768) closeSidebar();
+  });
+
 
   // Navigation tabs state
   const tabButtons = document.querySelectorAll(".nav-item");
