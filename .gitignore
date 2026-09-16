@@ -8,3 +8,4 @@ rust/target/
 .DS_Store
 Thumbs.db
 *.log
+session_string.txt

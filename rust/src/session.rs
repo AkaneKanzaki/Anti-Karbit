@@ -15,30 +15,105 @@ use std::path::Path;
 
 use base64::engine::general_purpose::STANDARD as B64;
 use base64::Engine as _;
+use tracing::warn;
+
+/// Header magic SQLite database.
+const SQLITE_HEADER: &[u8] = b"SQLite format 3\0";
+
+/// Membersihkan string base64 dari kemungkinan karakter liar saat disalin:
+/// - Tanda kutip pembungkus (" atau ')
+/// - Semua karakter whitespace (\r, \n, spasi, tab dari terminal line wrapping)
+/// - Karakter URL-safe (- dan _) dikonversi ke standard (+ dan /)
+/// - Penambahan padding '=' jika terpotong
+pub fn clean_base64_session(raw: &str) -> String {
+    let mut s = raw.trim();
+    // Hapus tanda petik pembungkus
+    if (s.starts_with('"') && s.ends_with('"')) || (s.starts_with('\'') && s.ends_with('\'')) {
+        if s.len() >= 2 {
+            s = &s[1..s.len() - 1];
+        }
+    }
+
+    // Filter seluruh whitespace (mengatasi wrapping baris terminal dan multi-line env)
+    let mut cleaned: String = s
+        .chars()
+        .filter(|c| !c.is_ascii_whitespace())
+        .collect();
+
+    // Hapus petik lagi jika sebelumnya berlapis (misal ' "..." ')
+    if (cleaned.starts_with('"') && cleaned.ends_with('"'))
+        || (cleaned.starts_with('\'') && cleaned.ends_with('\''))
+    {
+        if cleaned.len() >= 2 {
+            cleaned = cleaned[1..cleaned.len() - 1].to_string();
+        }
+    }
+
+    // Konversi URL-safe base64 ke standard
+    let mut normalized = cleaned.replace('-', "+").replace('_', "/");
+
+    // Auto-pad missing base64 padding
+    let rem = normalized.len() % 4;
+    if rem == 2 {
+        normalized.push_str("==");
+    } else if rem == 3 {
+        normalized.push('=');
+    }
+
+    normalized
+}
 
 /// Write the session file from `TELEGRAM_STRING_SESSION` when it is set.
 ///
 /// Returns `true` when the session file was restored from the env var.
 pub fn materialize_from_env(session_path: &str) -> Result<bool, SessionError> {
     let encoded = crate::config::get().telegram_string_session;
-    materialize_from_string(encoded.trim(), session_path)
+    materialize_from_string(&encoded, session_path)
 }
 
 /// The core of [`materialize_from_env`], split out so it can be tested
 /// without touching the process environment.
 pub fn materialize_from_string(encoded: &str, session_path: &str) -> Result<bool, SessionError> {
-    if encoded.is_empty() {
+    let cleaned = clean_base64_session(encoded);
+    if cleaned.is_empty() {
         return Ok(false);
     }
 
-    // Never overwrite a local session that already exists and is valid.
-    if Path::new(session_path).is_file() {
-        return Ok(false);
+    // Never overwrite a local session that already exists and is non-empty (>16 bytes).
+    if let Ok(meta) = Path::new(session_path).metadata() {
+        if meta.len() > 16 {
+            return Ok(false);
+        }
+    }
+
+    // Sisa modulo 4 == 1 tidak mungkin valid dalam base64 (1 karakter = 6 bit, < 1 byte)
+    if cleaned.len() % 4 == 1 {
+        return Err(SessionError::Decode(format!(
+            "Panjang input tidak valid: {} (sisa 1 karakter). Pastikan seluruh string session tersalin lengkap tanpa karakter terpotong.",
+            cleaned.len()
+        )));
     }
 
     let bytes = B64
-        .decode(encoded)
-        .map_err(|e| SessionError::Decode(e.to_string()))?;
+        .decode(&cleaned)
+        .map_err(|e| SessionError::Decode(format!("{e} (panjang string: {})", cleaned.len())))?;
+
+    if bytes.is_empty() {
+        return Err(SessionError::Decode("Hasil dekode kosong.".to_string()));
+    }
+
+    // Peringatkan bila hasil dekode bukan file SQLite session Telegram
+    if bytes.len() >= 16 && !bytes.starts_with(SQLITE_HEADER) {
+        warn!(
+            "Header file sesi tidak diawali dengan 'SQLite format 3'. Pastikan TELEGRAM_STRING_SESSION diekspor melalui 'antikarbit export-session' (bukan Telethon atau Pyrogram string session)."
+        );
+    }
+
+    if let Some(parent) = Path::new(session_path).parent() {
+        if !parent.as_os_str().is_empty() {
+            std::fs::create_dir_all(parent).map_err(|e| SessionError::Io(e.to_string()))?;
+        }
+    }
 
     std::fs::write(session_path, &bytes).map_err(|e| SessionError::Io(e.to_string()))?;
 
@@ -114,16 +189,68 @@ mod tests {
     }
 
     #[test]
-    fn tidak_menimpa_sesi_yang_sudah_ada() {
+    fn membersihkan_whitespace_newline_dan_petik() {
+        let dir = std::env::temp_dir().join("antikarbit_session_test");
+        let _ = std::fs::create_dir_all(&dir);
+        let path = dir.join("cleaned.session");
+        let _ = std::fs::remove_file(&path);
+
+        let original = b"Hello, Telegram Session!";
+        let encoded = B64.encode(original);
+
+        // Simulasi terminal copy-paste: disisipi \r\n, spasi, dan tanda petik
+        let dirty = format!("  \"{}\\r\\n  {}  \\n\"  ", &encoded[..10], &encoded[10..])
+            .replace("\\r", "\r")
+            .replace("\\n", "\n");
+
+        let restored = materialize_from_string(&dirty, path.to_str().unwrap()).unwrap();
+        assert!(restored);
+        assert_eq!(std::fs::read(&path).unwrap(), original);
+    }
+
+    #[test]
+    fn mendukung_base64_url_safe_dan_unpadded() {
+        let dir = std::env::temp_dir().join("antikarbit_session_test");
+        let _ = std::fs::create_dir_all(&dir);
+        let path = dir.join("urlsafe.session");
+        let _ = std::fs::remove_file(&path);
+
+        // Data yang menghasilkan '+' dan '/' dalam standard base64
+        let original = vec![251, 239]; // standard: ++8=, url-safe: --8=
+        let raw_url_safe = "--8"; // unpadded url safe
+
+        let restored = materialize_from_string(raw_url_safe, path.to_str().unwrap()).unwrap();
+        assert!(restored);
+        assert_eq!(std::fs::read(&path).unwrap(), original);
+    }
+
+    #[test]
+    fn menimpa_file_sesi_jika_kosong_nol_byte() {
+        let dir = std::env::temp_dir().join("antikarbit_session_test");
+        let _ = std::fs::create_dir_all(&dir);
+        let path = dir.join("empty.session");
+
+        // Tulis file 0 byte
+        std::fs::write(&path, b"").unwrap();
+        let encoded = B64.encode(b"sesi-baru-dari-env");
+
+        let restored = materialize_from_string(&encoded, path.to_str().unwrap()).unwrap();
+        assert!(restored, "file 0-byte harus boleh ditimpa");
+        assert_eq!(std::fs::read(&path).unwrap(), b"sesi-baru-dari-env");
+    }
+
+    #[test]
+    fn tidak_menimpa_sesi_valid_yang_sudah_ada() {
         let dir = std::env::temp_dir().join("antikarbit_session_test");
         let _ = std::fs::create_dir_all(&dir);
         let path = dir.join("existing.session");
 
-        std::fs::write(&path, b"sesi-asli").unwrap();
+        let existing_data = vec![1u8; 32];
+        std::fs::write(&path, &existing_data).unwrap();
         let encoded = B64.encode(b"sesi-baru");
 
         let restored = materialize_from_string(&encoded, path.to_str().unwrap()).unwrap();
-        assert!(!restored, "sesi lama tidak boleh ditimpa");
-        assert_eq!(std::fs::read(&path).unwrap(), b"sesi-asli");
+        assert!(!restored, "sesi lama yang valid tidak boleh ditimpa");
+        assert_eq!(std::fs::read(&path).unwrap(), existing_data);
     }
 }

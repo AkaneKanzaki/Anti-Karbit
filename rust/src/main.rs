@@ -25,7 +25,7 @@ use grammers_session::storages::SqliteSession;
 use serde_json::Value;
 use tokio::sync::broadcast;
 use tokio::task::JoinHandle;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 use crate::core::{Claimer, WaifuListener};
 use crate::recognizer::MultiEngine;
@@ -88,7 +88,10 @@ async fn connect_telegram() -> Result<TelegramSession, Box<dyn std::error::Error
     match session::materialize_from_env(&path) {
         Ok(true) => info!("Session restored from TELEGRAM_STRING_SESSION."),
         Ok(false) => {}
-        Err(e) => error!("{e}"),
+        Err(e) => {
+            error!("{e}");
+            return Err(format!("Gagal memulihkan sesi dari TELEGRAM_STRING_SESSION: {e}").into());
+        }
     }
 
     let session = Arc::new(SqliteSession::open(&path).await?);
@@ -105,10 +108,19 @@ async fn connect_telegram() -> Result<TelegramSession, Box<dyn std::error::Error
     if !client.is_authorized().await? {
         info!("Session is not authorised. Sign-in required.");
         let phone = prompt("Phone number (international format, e.g. +62812...): ").await;
+        if phone.is_empty() {
+            return Err(
+                "Nomor telepon kosong atau stdin tidak interaktif (headless/cloud). Jika menjalankan di cloud seperti Railway, login terlebih dahulu di lokal dengan 'antikarbit export-session' lalu isi variabel TELEGRAM_STRING_SESSION, atau gunakan Railway Volume."
+                    .into(),
+            );
+        }
         let token = client
             .request_login_code(&phone, &cfg.telegram_api_hash)
             .await?;
         let code = prompt("Login code (check your Telegram app): ").await;
+        if code.is_empty() {
+            return Err("Login code kosong. Pastikan terminal interaktif saat login.".into());
+        }
 
         match client.sign_in(&token, &code).await {
             Ok(_) => info!("Signed in."),
@@ -397,11 +409,18 @@ async fn run_export_session() -> Result<(), Box<dyn std::error::Error + Send + S
         }
     };
 
+    let out_file = "session_string.txt";
+    if let Err(e) = std::fs::write(out_file, &encoded) {
+        warn!("Gagal menulis ke berkas {out_file}: {e}");
+    } else {
+        info!("String sesi juga disimpan ke berkas '{out_file}' (bebas risiko line-wrapping).");
+    }
+
     println!("\n================ TELEGRAM_STRING_SESSION ================");
-    println!("Copy the single line below into the environment variable");
-    println!("TELEGRAM_STRING_SESSION on Railway (no spaces or newlines):\n");
+    println!("Salin string di bawah ini ke variabel TELEGRAM_STRING_SESSION di Railway");
+    println!("(atau buka dan salin langsung dari berkas 'session_string.txt'):\n");
     println!("{encoded}");
-    println!("\nLength: {} characters", encoded.len());
+    println!("\nPanjang: {} karakter", encoded.len());
     println!("=========================================================\n");
 
     Ok(())

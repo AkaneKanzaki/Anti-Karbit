@@ -66,10 +66,18 @@ fn split_list_lower(raw: &str) -> Vec<String> {
     split_list(raw).into_iter().map(|s| s.to_lowercase()).collect()
 }
 
-/// Read `key` from the environment, falling back to a default when empty.
+/// Read `key` from the environment, falling back to a default when empty,
+/// with leading and trailing whitespace stripped.
 fn env_or(key: &str, default: &str) -> String {
     match std::env::var(key) {
-        Ok(v) if !v.trim().is_empty() => v,
+        Ok(v) => {
+            let t = v.trim();
+            if t.is_empty() {
+                default.to_string()
+            } else {
+                t.to_string()
+            }
+        }
         _ => default.to_string(),
     }
 }

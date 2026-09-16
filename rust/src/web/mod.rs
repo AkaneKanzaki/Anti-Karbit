@@ -940,11 +940,36 @@ pub fn build_router(state: AppState, web_dir: &str) -> Router {
 /// Jalankan server dashboard.
 pub async fn serve(state: AppState, web_dir: &str) -> std::io::Result<()> {
     let cfg = config::get();
-    let addr = format!("{}:{}", cfg.web_host, cfg.web_port);
-    let listener = tokio::net::TcpListener::bind(&addr).await?;
 
+    let bind_host = {
+        let h = cfg.web_host.trim();
+        // Domain atau URL publik (misalnya *.railway.app atau https://...)
+        // tidak bisa di-bind sebagai local network interface IP di dalam container.
+        if h.contains("://") || h.contains(".railway.app") || h.contains(".up.railway.app") {
+            warn!("WEB_HOST '{h}' adalah URL/domain publik, bukan network interface IP lokal. Menggunakan fallback '0.0.0.0'.");
+            "0.0.0.0"
+        } else {
+            h
+        }
+    };
+
+    let addr = format!("{}:{}", bind_host, cfg.web_port);
+    let listener = match tokio::net::TcpListener::bind(&addr).await {
+        Ok(l) => l,
+        Err(e) => {
+            if bind_host != "0.0.0.0" {
+                warn!("Gagal bind ke {addr}: {e}. Mencoba fallback ke 0.0.0.0:{}...", cfg.web_port);
+                let fallback_addr = format!("0.0.0.0:{}", cfg.web_port);
+                tokio::net::TcpListener::bind(&fallback_addr).await?
+            } else {
+                return Err(e);
+            }
+        }
+    };
+
+    let actual_local_addr = listener.local_addr()?;
     info!("============================================================");
-    info!("Dashboard listening on http://localhost:{}", cfg.web_port);
+    info!("Dashboard listening on http://{actual_local_addr}");
     info!("============================================================");
 
     let app = build_router(state, web_dir);
