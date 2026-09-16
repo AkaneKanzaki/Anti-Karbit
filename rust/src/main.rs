@@ -94,6 +94,11 @@ async fn connect_telegram() -> Result<TelegramSession, Box<dyn std::error::Error
         }
     }
 
+    // Pastikan schema session SQLite valid (user_version = 1 & ipv6 valid) agar grammers tidak gagal
+    if let Err(e) = session::sanitize_session_db(&path).await {
+        warn!("Peringatan sanitasi database sesi: {e}");
+    }
+
     let session = Arc::new(SqliteSession::open(&path).await?);
 
     let SenderPool {

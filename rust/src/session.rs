@@ -126,6 +126,62 @@ pub fn export_to_string(session_path: &str) -> Result<String, SessionError> {
     Ok(B64.encode(bytes))
 }
 
+/// Memeriksa dan memperbaiki file sesi SQLite sebelum dibuka oleh grammers:
+/// 1. Jika tabel `dc_home` sudah ada tetapi `PRAGMA user_version` masih 0 (misal dibuat oleh generator eksternal),
+///    set `user_version = 1` agar grammers tidak mencoba `migrate_v0_to_v1` yang memicu error
+///    "table dc_home already exists".
+/// 2. Pastikan kolom `ipv6` pada tabel `dc_option` memiliki nilai yang valid (bukan string kosong),
+///    karena grammers mem-parse kolom tersebut sebagai `SocketAddr`.
+pub async fn sanitize_session_db(session_path: &str) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let p = Path::new(session_path);
+    if !p.exists() || p.metadata().map(|m| m.len()).unwrap_or(0) < 16 {
+        return Ok(());
+    }
+
+    let conn = match libsql::Builder::new_local(session_path).build().await {
+        Ok(b) => match b.connect() {
+            Ok(c) => c,
+            Err(e) => {
+                warn!("Gagal membuka koneksi SQLite untuk sanitasi: {e}");
+                return Ok(());
+            }
+        },
+        Err(e) => {
+            warn!("Gagal membangun builder SQLite untuk sanitasi: {e}");
+            return Ok(());
+        }
+    };
+
+    // Periksa apakah tabel dc_home sudah ada di database
+    let mut table_exists = false;
+    if let Ok(mut rows) = conn
+        .query(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='dc_home'",
+            (),
+        )
+        .await
+    {
+        if rows.next().await.ok().flatten().is_some() {
+            table_exists = true;
+        }
+    }
+
+    if table_exists {
+        // Set user_version = 1 agar grammers-session menganggap database sudah v1
+        let _ = conn.execute("PRAGMA user_version = 1", ()).await;
+
+        // Pastikan ipv6 diisi fallback jika kosong/null (grammers parse sebagai SocketAddr)
+        let _ = conn
+            .execute(
+                "UPDATE dc_option SET ipv6 = '[::1]:443' WHERE ipv6 = '' OR ipv6 IS NULL",
+                (),
+            )
+            .await;
+    }
+
+    Ok(())
+}
+
 #[derive(Debug)]
 pub enum SessionError {
     Decode(String),

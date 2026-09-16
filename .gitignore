@@ -9,3 +9,5 @@ rust/target/
 Thumbs.db
 *.log
 session_string.txt
+generate_session.py
+__pycache__/

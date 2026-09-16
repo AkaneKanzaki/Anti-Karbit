@@ -15,6 +15,9 @@ grammers-session = "0.10.0"
 rand = "0.10.2"
 regex = "1.13.1"
 reqwest = { version = "0.13.5", features = ["json", "multipart", "gzip", "brotli", "charset", "http2", "native-tls", "cookies"], default-features = false }
+# libsql dipakai untuk memvalidasi dan migrasi schema sesi sebelum grammers
+# SqliteSession::open() berjalan (mencegah konflik "table dc_home already exists").
+libsql = { version = "0.9.30", default-features = false, features = ["core"] }
 scraper = "0.27.0"
 serde_json = "1.0.151"
 sha2 = "0.11.0"
