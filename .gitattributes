@@ -1,0 +1,16 @@
+# Normalisasi akhir baris ke LF.
+#
+# Ini bukan kosmetik: Dockerfile dengan akhir baris CRLF dapat merusak build
+# di Linux — karakter \r ikut terbawa ke perintah RUN dan membuatnya gagal.
+# Karena image dibangun di Linux, seluruh berkas teks harus LF.
+* text=auto eol=lf
+
+# Berkas biner — jangan disentuh.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.ttf binary

@@ -1,0 +1,10 @@
+.env
+*.session
+*.session-journal
+rust/target
+rust/.cargo
+.git
+.gitignore
+.vscode
+README.md
+test_waifu.png

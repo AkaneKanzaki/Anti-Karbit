@@ -1,0 +1,20 @@
+<div class="status-bar" id="bot-status-pill">
+  <div class="status-main">
+    <span class="dot {% if bot_ready && is_active %}dot-live{% else %}dot-idle{% endif %}" id="status-dot"></span>
+    <div class="status-copy">
+      <span class="status-text" id="status-text">
+        {% if !bot_ready %}Waiting for Telegram{% else if is_active %}Listening{% else %}Paused{% endif %}
+      </span>
+      <span class="status-sub">
+        {% if !bot_ready %}The bot is not connected. Check the logs for details.
+        {% else if is_active %}Watching groups for new characters.
+        {% else %}The bot is paused and will ignore new messages.{% endif %}
+      </span>
+    </div>
+  </div>
+
+  <button class="btn {% if is_active %}btn-ghost{% else %}btn-primary{% endif %}" id="btn-toggle-bot"
+    hx-post="/htmx/toggle" hx-target="#bot-toggle-wrapper" hx-swap="innerHTML" {% if !bot_ready %}disabled{% endif %}>
+    <span id="btn-toggle-label">{% if is_active %}Pause{% else %}Resume{% endif %}</span>
+  </button>
+</div>

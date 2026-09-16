@@ -1,0 +1,37 @@
+[package]
+name = "antikarbit"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+askama = "0.14"
+axum = { version = "0.8.9", features = ["json"] }
+axum-extra = { version = "0.12.6", features = ["cookie"] }
+base64 = "0.23.1"
+dotenvy = "0.15.7"
+futures-util = "0.3.34"
+grammers-client = "0.10.0"
+grammers-session = "0.10.0"
+rand = "0.10.2"
+regex = "1.13.1"
+reqwest = { version = "0.13.5", features = ["json", "multipart", "gzip", "brotli", "charset", "http2", "native-tls", "cookies"], default-features = false }
+scraper = "0.27.0"
+serde_json = "1.0.151"
+sha2 = "0.11.0"
+time = "0.3.55"
+tokio = { version = "1.53.1", features = ["full"] }
+tower-http = { version = "0.7.1", features = ["fs"] }
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
+
+# Profil rilis dioptimalkan untuk ukuran: target Railway hanya 1 GB disk,
+# dan binary yang kecil juga mempercepat cold start.
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = true
+
+[dev-dependencies]
+tower = { version = "0.5.3", features = ["util"] }
