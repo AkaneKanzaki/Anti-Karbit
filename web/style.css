@@ -238,6 +238,89 @@ select.input {
   border-color: rgba(74, 222, 128, 0.3);
 }
 
+.alert-warn {
+  color: var(--warn);
+  background: rgba(251, 191, 36, 0.07);
+  border-color: rgba(251, 191, 36, 0.28);
+}
+
+/* --------------------------------------------------------------------------
+   Environment locks
+
+   Settings supplied by a platform environment variable cannot be changed from
+   the dashboard: the environment wins. The notice explains why, and the chip
+   marks exactly which fields are affected.
+   -------------------------------------------------------------------------- */
+
+.env-lock-notice {
+  margin-bottom: 20px;
+  line-height: 1.6;
+}
+
+.env-lock-notice strong {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.env-lock-notice p {
+  margin-top: 6px;
+  font-size: 12.5px;
+  color: var(--text-dim);
+}
+
+.env-lock-notice code {
+  padding: 1px 5px;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 4px;
+}
+
+.env-lock-list {
+  margin-top: 10px !important;
+}
+
+.lock-chip {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--warn);
+  vertical-align: middle;
+  background: rgba(251, 191, 36, 0.12);
+  border: 1px solid rgba(251, 191, 36, 0.3);
+  border-radius: 4px;
+}
+
+/* A locked input must look inert, not merely be inert. */
+.input[data-env-locked] {
+  color: var(--text-dim);
+  cursor: not-allowed;
+  background: rgba(255, 255, 255, 0.03);
+  border-color: var(--border);
+}
+
+.input[data-env-locked]:focus {
+  outline: none;
+  border-color: var(--border);
+}
+
+label.check input[data-env-locked] {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+label.check:has(input[data-env-locked]) span {
+  color: var(--text-faint);
+}
+
 /* --------------------------------------------------------------------------
    Shell
    -------------------------------------------------------------------------- */

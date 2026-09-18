@@ -553,16 +553,50 @@ async fn settings_post(Json(body): Json<Value>) -> Response {
     match config::update_and_save(&body) {
         Ok(()) => {
             info!("Settings updated from the web dashboard.");
-            Json(json!({ "success": true, "config": config::get().as_dict() })).into_response()
+            Json(json!({
+                "success": true,
+                "message": save_message(),
+                "config": config::get().as_dict(),
+            }))
+            .into_response()
         }
         Err(e) => {
             warn!("Could not write .env: {e}");
-            let mut response =
-                Json(json!({ "success": false, "message": "Failed to write the .env file" }))
-                    .into_response();
+            let mut response = Json(json!({
+                "success": false,
+                "message": format!("Failed to write the .env file: {e}"),
+            }))
+            .into_response();
             *response.status_mut() = StatusCode::INTERNAL_SERVER_ERROR;
             response
         }
+    }
+}
+
+/// Explain what a save actually did, since it differs between a local run and
+/// a platform deployment.
+fn save_message() -> String {
+    let locked = config::locked_keys();
+    if config::is_platform_deployment() {
+        if locked.is_empty() {
+            "Applied for this session. This host has no persistent disk, so the change is \
+             lost on the next restart or deploy."
+                .to_string()
+        } else {
+            format!(
+                "Applied for this session. {} field(s) are controlled by platform environment \
+                 variables and keep their env value. Changes are lost on restart or deploy.",
+                locked.len()
+            )
+        }
+    } else if locked.is_empty() {
+        "Settings saved to .env and applied immediately.".to_string()
+    } else {
+        format!(
+            "Settings applied immediately. {} field(s) controlled by environment variables were \
+             left unchanged.",
+            locked.len()
+        )
     }
 }
 
@@ -671,6 +705,8 @@ pub struct IndexTemplate {
     pub saucenao_similarity: f64,
     pub saucenao_key: String,
     pub lens_enabled: bool,
+    pub ascii2d_enabled: bool,
+    pub ascii2d_similarity: f64,
     pub triggers: String,
     pub target_chats: String,
     pub min_delay: f64,
@@ -679,6 +715,18 @@ pub struct IndexTemplate {
     pub send_timeout: f64,
     pub success_keywords: String,
     pub fail_keywords: String,
+    /// Whether the app runs on a host whose filesystem is ephemeral (Railway
+    /// and friends), which is what makes local persistence unreliable.
+    pub platform_deployment: bool,
+    /// Managed keys supplied by the platform environment. Those fields are
+    /// rendered read-only, because the environment wins over the dashboard.
+    pub env_locked_keys: Vec<String>,
+    /// Where settings are written locally. Shown so the user can see which
+    /// file is (or is not) being updated.
+    pub env_file: String,
+    /// Whether at least one field is locked, so the notice is only rendered
+    /// when it is actually relevant.
+    pub has_env_locks: bool,
 }
 
 #[derive(Template)]
@@ -702,6 +750,9 @@ pub struct StatsCardsTemplate {
 #[template(path = "partials/settings_toast.html")]
 pub struct SettingsToastTemplate {
     pub message: String,
+    /// Errors are rendered with the `alert-error` class instead of
+    /// `alert-success`, so a failed save never looks like a successful one.
+    pub is_error: bool,
 }
 
 async fn index_page(
@@ -759,6 +810,8 @@ async fn index_page(
         (0, 0, 0, 100.0)
     };
 
+    let env_locked_keys = config::locked_keys();
+
     HtmlTemplate(IndexTemplate {
         authenticated: auth,
         is_protected: protected,
@@ -779,6 +832,8 @@ async fn index_page(
         saucenao_similarity: cfg.saucenao_min_similarity,
         saucenao_key: cfg.saucenao_api_key.clone(),
         lens_enabled: cfg.lens_enabled,
+        ascii2d_enabled: cfg.ascii2d_enabled,
+        ascii2d_similarity: cfg.ascii2d_min_similarity,
         triggers: cfg.trigger_keywords.join(", "),
         target_chats: cfg
             .target_chat_ids
@@ -792,6 +847,10 @@ async fn index_page(
         send_timeout: cfg.send_timeout_seconds,
         success_keywords: cfg.success_keywords.join(", "),
         fail_keywords: cfg.fail_keywords.join(", "),
+        has_env_locks: !env_locked_keys.is_empty(),
+        env_locked_keys,
+        platform_deployment: config::is_platform_deployment(),
+        env_file: config::env_file_display(),
     })
     .into_response()
 }
@@ -852,7 +911,8 @@ async fn htmx_settings(Form(form): Form<HashMap<String, String>>) -> Response {
         Ok(()) => {
             info!("Settings updated from the settings form.");
             HtmlTemplate(SettingsToastTemplate {
-                message: "Settings saved to .env and applied immediately.".to_string(),
+                message: save_message(),
+                is_error: false,
             })
             .into_response()
         }
@@ -860,6 +920,7 @@ async fn htmx_settings(Form(form): Form<HashMap<String, String>>) -> Response {
             warn!("Could not write .env: {e}");
             HtmlTemplate(SettingsToastTemplate {
                 message: format!("Could not save settings: {e}"),
+                is_error: true,
             })
             .into_response()
         }
@@ -1105,18 +1166,38 @@ mod tests {
             "SAUCENAO_API_KEY",
             "SAUCENAO_MIN_SIMILARITY",
             "LENS_ENABLED",
+            "ASCII2D_ENABLED",
+            "ASCII2D_MIN_SIMILARITY",
             "TRIGGER_KEYWORDS",
             "TARGET_CHAT_IDS",
             "MIN_DELAY_SECONDS",
             "MAX_DELAY_SECONDS",
             "VERIFY_TIMEOUT_SECONDS",
-            "SUCCESS_KEYWORDS",
-            "FAIL_KEYWORDS",
             "WEB_PORT",
             "WEB_HOST",
+            // Metadata the Settings tab needs to explain what is editable.
+            "ENV_LOCKED_KEYS",
+            "PLATFORM_DEPLOYMENT",
+            "ENV_FILE",
         ] {
             assert!(json.get(key).is_some(), "key pengaturan hilang: {key}");
         }
+    }
+
+    #[tokio::test]
+    async fn status_melaporkan_kunci_yang_terkunci_env() {
+        // The Settings tab reads this list to decide which fields to lock.
+        let response = test_app()
+            .oneshot(request(Method::GET, "/api/status"))
+            .await
+            .expect("handler berjalan");
+
+        let json = body_json(response).await;
+        let cfg = json.get("config").expect("config ada");
+        assert!(
+            cfg.get("ENV_LOCKED_KEYS").unwrap().is_array(),
+            "ENV_LOCKED_KEYS harus berupa array, supaya frontend bisa iterasi"
+        );
     }
 
     #[tokio::test]
@@ -1399,7 +1480,7 @@ mod tests {
     }
 
     /// Build an `IndexTemplate` with neutral values, so a test can vary one field
-    /// without spelling out all 26 of them.
+    /// without spelling out all of them.
     fn sample_index_template() -> IndexTemplate {
         IndexTemplate {
             authenticated: false,
@@ -1421,6 +1502,8 @@ mod tests {
             saucenao_similarity: 70.0,
             saucenao_key: String::new(),
             lens_enabled: true,
+            ascii2d_enabled: true,
+            ascii2d_similarity: 80.0,
             triggers: "A waifu has appeared!".into(),
             target_chats: String::new(),
             min_delay: 0.0,
@@ -1429,6 +1512,10 @@ mod tests {
             send_timeout: 5.0,
             success_keywords: "now protected".into(),
             fail_keywords: "not quite right".into(),
+            platform_deployment: false,
+            env_locked_keys: Vec::new(),
+            env_file: ".env".into(),
+            has_env_locks: false,
         }
     }
 
@@ -1476,5 +1563,69 @@ mod tests {
 
         let html = tpl.render().expect("template terender");
         assert!(!html.contains("login-overlay"));
+    }
+
+    /// A template that renders the signed-in application, which is what the
+    /// Settings tab lives inside. `sample_index_template()` is unauthenticated
+    /// by default, and an unauthenticated render is only the login overlay.
+    fn signed_in_template() -> IndexTemplate {
+        let mut tpl = sample_index_template();
+        tpl.authenticated = true;
+        tpl
+    }
+
+    #[test]
+    fn template_menampilkan_bidang_ascii2d() {
+        use askama::Template as _;
+
+        let html = signed_in_template().render().expect("template terender");
+        assert!(
+            html.contains("name=\"ASCII2D_MIN_SIMILARITY\""),
+            "ambang Ascii2d tidak dirender di tab Settings"
+        );
+        assert!(
+            html.contains("name=\"ASCII2D_ENABLED\""),
+            "toggle Ascii2d tidak dirender di tab Settings"
+        );
+    }
+
+    #[test]
+    fn template_menandai_bidang_yang_terkunci_env() {
+        use askama::Template as _;
+
+        let mut tpl = signed_in_template();
+        tpl.env_locked_keys = vec!["CLAIM_COMMAND".to_string(), "IQDB_MIN_SIMILARITY".to_string()];
+        tpl.has_env_locks = true;
+        tpl.platform_deployment = true;
+
+        let html = tpl.render().expect("template terender");
+
+        // The notice explains why some fields cannot be edited.
+        assert!(
+            html.contains("env-lock-notice"),
+            "notice kunci env tidak dirender"
+        );
+        // The locked fields must actually be read-only, not merely described.
+        assert!(
+            html.contains("data-env-locked"),
+            "penanda data-env-locked tidak ada di halaman"
+        );
+        // And the locked key names are listed, so the user knows which to fix.
+        assert!(html.contains("CLAIM_COMMAND") && html.contains("IQDB_MIN_SIMILARITY"));
+    }
+
+    #[test]
+    fn template_tanpa_kunci_env_tidak_menampilkan_notice() {
+        use askama::Template as _;
+
+        // A plain local run must not be warned about a problem it does not have.
+        let html = signed_in_template().render().expect("template terender");
+        assert!(
+            !html.contains("env-lock-notice"),
+            "notice kunci env muncul padahal tidak ada kunci yang terkunci"
+        );
+        // The Ascii2d fields are still present, just without lock markers.
+        assert!(html.contains("name=\"ASCII2D_MIN_SIMILARITY\""));
+        assert!(!html.contains("data-env-locked"));
     }
 }

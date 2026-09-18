@@ -8,8 +8,8 @@ name through **reverse image search**, sends the claim command
 (`/protecc <name>`), verifies the game bot's reply, and retries with alternate
 names when a claim is rejected.
 
-> **Free, and no AI API keys.** Uses IQDB, SauceNAO, Trace.moe and Google Lens,
-> enriched with data from AniList.
+> **Free, and no AI API keys.** Uses IQDB, SauceNAO, Ascii2d, Trace.moe and
+> Google Lens, enriched with data from AniList.
 
 ---
 
@@ -21,12 +21,12 @@ entirely.
 | | Python | Rust |
 |---|---|---|
 | Runtime size | `.venv` ~63 MB | binary ~11 MB |
-| Reverse search | 4 engines **sequentially** = 7.40 s | 4 engines **in parallel** = 2.78 s |
+| Reverse search | 4 engines **sequentially** = 7.40 s | 5 engines **in parallel** = 2.78 s |
 | Claim verification | polls every 0.8 s, **blocks** the listener | event driven, **non-blocking** |
 | Repeated character | always ~2.8 s | hash cache, effectively instant |
 | Delay before claiming | 0.5–1.5 s (artificial) | 0 (configurable) |
 
-The 2.78 s figure is measured, not estimated — on `test_waifu.png` with all four
+The 2.78 s figure is measured, not estimated — on `test_waifu.png` with the
 engines enabled.
 
 **Why non-blocking verification matters.** Previously a single claim waiting for
@@ -50,7 +50,8 @@ Message arrives in a group
       |
       +-- fan out to every active engine
             IQDB ---+
-         SauceNAO ---+  results stream back as
+         SauceNAO ---+
+          Ascii2d ---+  results stream back as
          Trace.moe ---+  each engine finishes
         Google Lens ---+
                       |
@@ -60,6 +61,53 @@ Message arrives in a group
 
 Each engine reads its similarity threshold from configuration **at call time**,
 so changing it in the dashboard takes effect without a restart.
+
+### Engines
+
+| Engine | Needs a key | Always on | Notes |
+|---|---|---|---|
+| IQDB | no | yes | Booru databases (Danbooru, Gelbooru, Konachan, yande.re) |
+| Trace.moe | no | yes | Anime screenshots; returns episode + timestamp |
+| Ascii2d | no | `ASCII2D_ENABLED` | Pixiv/Twitter artwork; runs colour then monochrome |
+| SauceNAO | yes | when a key is set | Highest quality when keyed |
+| Google Lens | no | `LENS_ENABLED` | Most fragile; results must pass AniList verification |
+
+**Ascii2d has no similarity score.** Unlike IQDB, it only knows whether an
+artwork is indexed, not how closely it matches. So `ASCII2D_MIN_SIMILARITY` is
+compared against the *evidence strength* of the matched row:
+
+| Threshold | Rows that qualify |
+|---|---|
+| 80 (default) | character **and** series found |
+| 75 | also a bare character name |
+| 65 | also a guess derived from a Pixiv title |
+| 0 | everything |
+
+---
+
+## Configuration and deployment
+
+Settings can be changed from the Dashboard's **Settings** tab, but the
+environment **always wins**:
+
+1. On startup, variables already present in the environment are recorded as
+   *locked*.
+2. Locked keys are shown in the UI with an `env` chip and rendered read-only.
+3. Values from the environment are never overwritten in `.env`.
+
+This matters on Railway and similar hosts, where the container filesystem is
+**ephemeral**. A `.env` written by the dashboard disappears on the next restart
+or redeploy, so a field that looked saved would silently revert. Locking makes
+the real source of truth visible instead of hiding it.
+
+Practical consequence:
+
+* A setting you want to be **permanent** → set it as a Railway Variable.
+* A setting you want to **tweak live** → leave it out of Railway Variables and
+  manage it from the dashboard (it lasts for the life of the container).
+
+When deployed to such a host, the dashboard also says so in the Settings tab
+rather than implying that changes will persist.
 
 ---
 
@@ -155,13 +203,18 @@ example `/data/waifu_claimer_session`.
 `TELEGRAM_API_ID`, `TELEGRAM_API_HASH`, `DASHBOARD_PASSWORD`, and optionally
 `SAUCENAO_API_KEY`.
 
+Only set a variable here if you want it to be **permanent and not editable from
+the dashboard**. Anything you leave out stays editable in the Settings tab, and
+changes there last for the life of the container. See
+[Configuration and deployment](#configuration-and-deployment) for the full rule.
+
 ---
 
 ## Development
 
 ```powershell
 cd rust
-cargo test          # 54 unit and HTTP integration tests
+cargo test          # 85 unit and HTTP integration tests
 cargo clippy        # lints
 ```
 
@@ -170,7 +223,7 @@ cargo clippy        # lints
 ```
 rust/src/
   main.rs              four modes: web, cli, export-session, test-image
-  config.rs            reads and writes .env
+  config.rs            reads and writes .env, plus env-lock detection
   http.rs              shared HTTP client (connection pooling)
   cache.rs             image hash -> character cache
   session.rs           Telegram session portability
@@ -181,6 +234,7 @@ rust/src/
     mod.rs             engine fan-out
     base.rs            CharacterInfo, name splitting
     iqdb.rs            IQDB plus booru tag classification
+    ascii2d.rs         Ascii2d (Pixiv/Twitter), reuses the booru tag classifier
     saucenao.rs        SauceNAO
     tracemoe.rs        Trace.moe
     lens.rs            Google Lens (must pass AniList verification)

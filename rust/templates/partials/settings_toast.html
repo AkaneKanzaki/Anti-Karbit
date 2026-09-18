@@ -1,1 +1,4 @@
-<div class="alert alert-success" id="settings-toast">{{ message }}</div>
+{#- Settings save feedback. `is_error` selects the visual treatment, so a failed
+    save is never mistaken for a successful one. -#}
+<div class="alert {% if is_error %}alert-error{% else %}alert-success{% endif %}" id="settings-toast">{{
+    message }}</div>

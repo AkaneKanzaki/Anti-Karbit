@@ -194,7 +194,7 @@ fn print_banner(cfg: &config::Config) {
         "\n============================================================\n\
          \x20  ANTI-KARBIT: WAIFU CLAIMER BOT (RUST)\n\
          ============================================================\n\
-         * Engine Vision : IQDB + SauceNAO + Trace.moe + Google Lens (paralel)\n\
+         * Engine Vision : IQDB + SauceNAO + Ascii2d + Trace.moe + Google Lens (paralel)\n\
          * Claim Command : {}\n\
          * Name Format   : {}\n\
          * Trigger Words : {}\n\

@@ -11,3 +11,4 @@ Thumbs.db
 session_string.txt
 generate_session.py
 __pycache__/
+.workbuddy-ai/
