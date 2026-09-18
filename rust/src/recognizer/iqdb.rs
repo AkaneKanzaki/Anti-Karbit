@@ -88,7 +88,9 @@ const THEMES_AND_COSTUMES: &[&str] = &[
     "pantyshot", "upskirt", "underbust", "crossover", "gender_bend", "gender_swap",
     "bad_id", "bad_link", "bad_pixiv_id", "copyright_request", "artist_request",
     "virtual_youtuber", "vtuber", "indie_vtuber", "envtuber", "jpvtuber", "idvtuber",
-    "voicevox", "vocaloid", "utaite",
+    // `voicevox` and `vocaloid` live in KNOWN_SERIES_TAGS instead: they name a
+    // franchise, and classifying them as a costume threw the series away.
+    "utaite",
 ];
 
 const KNOWN_SERIES_TAGS: &[&str] = &[
@@ -122,6 +124,16 @@ const KNOWN_SERIES_TAGS: &[&str] = &[
     "chainsaw_man", "jujutsu_kaisen", "spy_x_family", "lycoris_recoil",
     "neon_genesis_evangelion", "evangelion", "dragon_ball", "naruto",
     "one_piece", "bleach", "fairy_tail", "attack_on_titan",
+    // Vocaloid/UTAU and friends are franchises, not costumes. They used to sit
+    // in THEMES_AND_COSTUMES, which meant `hatsune_miku_(vocaloid)` had its
+    // series silently thrown away by the `is_theme` check in the caller and
+    // showed up as "Unknown" on the dashboard.
+    //
+    // Only the *franchise* names go here. A character name (for example
+    // `hatsune_miku`) must NOT: `is_series_tag` runs before the character
+    // branch, so listing it would swallow the character tag itself.
+    "vocaloid", "vocaloid_2", "project_diva",
+    "utau", "voicevox", "voiceroid", "cevio", "synthesizer_v",
     "shingeki_no_kyojin", "fullmetal_alchemist", "hunter_x_hunter", "demon_slayer",
     "kimetsu_no_yaiba", "my_hero_academia", "boku_no_hero_academia",
 ];
@@ -155,6 +167,14 @@ const SERIES_ALIASES: &[(&str, &str)] = &[
     ("noripro", "NoriPro"),
     ("touhou", "Touhou Project"),
     ("touhou_project", "Touhou Project"),
+    ("vocaloid", "Vocaloid"),
+    ("vocaloid_2", "Vocaloid 2"),
+    ("project_diva", "Project DIVA"),
+    ("voicevox", "VOICEVOX"),
+    ("utau", "UTAU"),
+    ("voiceroid", "Voiceroid"),
+    ("cevio", "CeVIO"),
+    ("synthesizer_v", "Synthesizer V"),
     ("kancolle", "Kantai Collection"),
     ("kantai_collection", "Kantai Collection"),
     ("re:zero_kara_hajimeru_isekai_seikatsu", "Re:Zero"),
@@ -283,13 +303,33 @@ fn parse_parentheticals(tag: &str) -> (Option<String>, Option<String>) {
     let mut series_part: Option<String> = None;
     for paren in parentheticals.iter().rev() {
         let paren_norm = paren.to_lowercase().replace(' ', "_");
+
+        // A recognised series tag or a known alias is always the series.
         if SET_SERIES_TAGS.contains(paren_norm.as_str())
             || MAP_ALIASES.contains_key(paren_norm.as_str())
         {
             series_part = Some(paren.clone());
             break;
         }
-        // A physical qualifier is usually one short word; anything else is a series.
+
+        // Otherwise a single word is a physical qualifier, not a series.
+        //
+        // `inugami_korone_(dog)` and `hatsune_miku_(plants)` are common booru
+        // shapes where the parenthetical describes the *picture* (the animal,
+        // the scenery), not a franchise. Treating it as a series produced a
+        // nonsense series like "Dog" or "Plants" on the dashboard. A series is
+        // overwhelmingly multi-word or already in the known-tag list, so
+        // requiring >1 word loses almost nothing and stops the false positives.
+        //
+        // The `(dog)_(hololive)` case still resolves: the loop runs right to
+        // left, so `hololive` is seen first and breaks out.
+        if !paren.contains(' ')
+            && !paren.contains('_')
+            && !SET_SERIES_WORDS.contains(paren_norm.as_str())
+        {
+            continue;
+        }
+
         if paren.split_whitespace().count() <= 3
             && !is_artist(&paren_norm)
             && !is_generic(&paren_norm)
@@ -658,5 +698,50 @@ mod tests {
         let (c, s) = extract_character_from_tags("inugami_korone_(dog)_(hololive)");
         assert_eq!(c.as_deref(), Some("Inugami Korone"));
         assert_eq!(s.as_deref(), Some("Hololive"));
+    }
+
+    #[test]
+    fn qualifier_fisik_tidak_dianggap_seri() {
+        // Regression: a lone single-word qualifier used to become the series,
+        // so the dashboard showed "Dog" or "Plants" as the franchise.
+        assert_eq!(
+            extract_character_from_tags("inugami_korone_(dog)").1,
+            None,
+            "kualifikasi fisik tidak boleh jadi seri"
+        );
+        assert_eq!(
+            extract_character_from_tags("hatsune_miku_(plants)").1,
+            None,
+            "tag pemandangan tidak boleh jadi seri"
+        );
+        // The character is still identified -- only the series is withheld.
+        assert_eq!(
+            extract_character_from_tags("inugami_korone_(dog)").0.as_deref(),
+            Some("Inugami Korone")
+        );
+    }
+
+    #[test]
+    fn seri_satu_kata_multi_kata_tetap_dikenali() {
+        // The single-word guard must not swallow a real multi-word series, nor
+        // a known one-word series tag.
+        assert_eq!(
+            extract_character_from_tags("ai_hoshino_(oshi_no_ko)").1.as_deref(),
+            Some("Oshi no Ko")
+        );
+        assert_eq!(
+            extract_character_from_tags("komeiji_satori_(touhou)").1.as_deref(),
+            Some("Touhou Project")
+        );
+    }
+
+    #[test]
+    fn vocaloid_adalah_seri_bukan_kostum() {
+        // Regression: `vocaloid` sat in THEMES_AND_COSTUMES, so the caller's
+        // `is_theme` check discarded the series and the dashboard said
+        // "Unknown" for a perfectly good Hatsune Miku tag.
+        let (c, s) = extract_character_from_tags("hatsune_miku_(vocaloid)");
+        assert_eq!(c.as_deref(), Some("Hatsune Miku"));
+        assert_eq!(s.as_deref(), Some("Vocaloid"));
     }
 }
