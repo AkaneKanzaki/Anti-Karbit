@@ -705,8 +705,6 @@ pub struct IndexTemplate {
     pub saucenao_similarity: f64,
     pub saucenao_key: String,
     pub lens_enabled: bool,
-    pub ascii2d_enabled: bool,
-    pub ascii2d_similarity: f64,
     pub triggers: String,
     pub target_chats: String,
     pub min_delay: f64,
@@ -832,8 +830,6 @@ async fn index_page(
         saucenao_similarity: cfg.saucenao_min_similarity,
         saucenao_key: cfg.saucenao_api_key.clone(),
         lens_enabled: cfg.lens_enabled,
-        ascii2d_enabled: cfg.ascii2d_enabled,
-        ascii2d_similarity: cfg.ascii2d_min_similarity,
         triggers: cfg.trigger_keywords.join(", "),
         target_chats: cfg
             .target_chat_ids
@@ -1166,8 +1162,6 @@ mod tests {
             "SAUCENAO_API_KEY",
             "SAUCENAO_MIN_SIMILARITY",
             "LENS_ENABLED",
-            "ASCII2D_ENABLED",
-            "ASCII2D_MIN_SIMILARITY",
             "TRIGGER_KEYWORDS",
             "TARGET_CHAT_IDS",
             "MIN_DELAY_SECONDS",
@@ -1502,8 +1496,6 @@ mod tests {
             saucenao_similarity: 70.0,
             saucenao_key: String::new(),
             lens_enabled: true,
-            ascii2d_enabled: true,
-            ascii2d_similarity: 80.0,
             triggers: "A waifu has appeared!".into(),
             target_chats: String::new(),
             min_delay: 0.0,
@@ -1575,21 +1567,6 @@ mod tests {
     }
 
     #[test]
-    fn template_menampilkan_bidang_ascii2d() {
-        use askama::Template as _;
-
-        let html = signed_in_template().render().expect("template terender");
-        assert!(
-            html.contains("name=\"ASCII2D_MIN_SIMILARITY\""),
-            "ambang Ascii2d tidak dirender di tab Settings"
-        );
-        assert!(
-            html.contains("name=\"ASCII2D_ENABLED\""),
-            "toggle Ascii2d tidak dirender di tab Settings"
-        );
-    }
-
-    #[test]
     fn template_menandai_bidang_yang_terkunci_env() {
         use askama::Template as _;
 
@@ -1624,8 +1601,6 @@ mod tests {
             !html.contains("env-lock-notice"),
             "notice kunci env muncul padahal tidak ada kunci yang terkunci"
         );
-        // The Ascii2d fields are still present, just without lock markers.
-        assert!(html.contains("name=\"ASCII2D_MIN_SIMILARITY\""));
         assert!(!html.contains("data-env-locked"));
     }
 }

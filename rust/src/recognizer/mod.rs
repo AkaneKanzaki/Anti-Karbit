@@ -7,12 +7,11 @@
 //!
 //! Measured on `test_waifu.png`: 7.40 s sequential -> 2.78 s in parallel.
 //!
-//! All five engines are always constructed. Which ones actually run is decided
-//! **at call time** from current configuration, so enabling SauceNAO, Ascii2d,
-//! or Google Lens from the web dashboard takes effect immediately.
+//! All four engines are always constructed. Which ones actually run is decided
+//! **at call time** from current configuration, so enabling SauceNAO or Google
+//! Lens from the web dashboard takes effect immediately.
 
 pub mod anilist;
-pub mod ascii2d;
 pub mod base;
 pub mod iqdb;
 pub mod lens;
@@ -34,7 +33,6 @@ use crate::config;
 pub enum EngineKind {
     Iqdb,
     SauceNao,
-    Ascii2d,
     TraceMoe,
     Lens,
 }
@@ -44,7 +42,6 @@ impl EngineKind {
         match self {
             EngineKind::Iqdb => "IQDB",
             EngineKind::SauceNao => "SauceNAO",
-            EngineKind::Ascii2d => "Ascii2d",
             EngineKind::TraceMoe => "Trace.moe",
             EngineKind::Lens => "Google Lens",
         }
@@ -56,7 +53,6 @@ impl EngineKind {
 pub enum Engine {
     Iqdb(iqdb::IqdbRecognizer),
     SauceNao(saucenao::SauceNaoRecognizer),
-    Ascii2d(ascii2d::Ascii2dRecognizer),
     TraceMoe(tracemoe::TraceMoeRecognizer),
     Lens(lens::GoogleLensRecognizer),
 }
@@ -66,7 +62,6 @@ impl Engine {
         match self {
             Engine::Iqdb(_) => EngineKind::Iqdb,
             Engine::SauceNao(_) => EngineKind::SauceNao,
-            Engine::Ascii2d(_) => EngineKind::Ascii2d,
             Engine::TraceMoe(_) => EngineKind::TraceMoe,
             Engine::Lens(_) => EngineKind::Lens,
         }
@@ -80,7 +75,6 @@ impl Engine {
         match self {
             Engine::Iqdb(e) => e.identify(image_bytes).await,
             Engine::SauceNao(e) => e.identify(image_bytes).await,
-            Engine::Ascii2d(e) => e.identify(image_bytes).await,
             Engine::TraceMoe(e) => e.identify(image_bytes).await,
             Engine::Lens(e) => e.identify(image_bytes).await,
         }
@@ -97,7 +91,6 @@ impl MultiEngine {
         let all = vec![
             Arc::new(Engine::Iqdb(iqdb::IqdbRecognizer)),
             Arc::new(Engine::SauceNao(saucenao::SauceNaoRecognizer)),
-            Arc::new(Engine::Ascii2d(ascii2d::Ascii2dRecognizer)),
             Arc::new(Engine::TraceMoe(tracemoe::TraceMoeRecognizer)),
             Arc::new(Engine::Lens(lens::GoogleLensRecognizer)),
         ];
@@ -110,8 +103,7 @@ impl MultiEngine {
 
     /// The engines that are active under current configuration.
     ///
-    /// SauceNAO only when an API key is set; Google Lens and Ascii2d follow
-    /// their own enable flags. IQDB and Trace.moe are always on.
+    /// SauceNAO only when an API key is set; Google Lens only when enabled.
     pub fn active(&self) -> Vec<Arc<Engine>> {
         let cfg = config::get();
         self.all
@@ -119,7 +111,6 @@ impl MultiEngine {
             .filter(|engine| match engine.kind() {
                 EngineKind::SauceNao => !cfg.saucenao_api_key.trim().is_empty(),
                 EngineKind::Lens => cfg.lens_enabled,
-                EngineKind::Ascii2d => cfg.ascii2d_enabled,
                 EngineKind::Iqdb | EngineKind::TraceMoe => true,
             })
             .cloned()
@@ -201,19 +192,9 @@ mod tests {
 
     #[test]
     fn semua_engine_selalu_dibangun() {
-        // All five engines are built once; filtering happens at call time so
+        // All four engines are built once; filtering happens at call time so
         // dashboard changes take effect immediately.
         let engine = MultiEngine::new();
-        assert_eq!(engine.all.len(), 5);
-    }
-
-    #[test]
-    fn ascii2d_ikut_aktif_saat_dinyalakan() {
-        let engine = MultiEngine::new();
-        let labels = engine.active_labels();
-        assert!(
-            labels.contains(&"Ascii2d"),
-            "Ascii2d harus aktif selama ASCII2D_ENABLED tidak dimatikan"
-        );
+        assert_eq!(engine.all.len(), 4);
     }
 }

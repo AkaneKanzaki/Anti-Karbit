@@ -32,9 +32,6 @@ pub struct Config {
     pub saucenao_api_key: String,
     pub saucenao_min_similarity: f64,
     pub lens_enabled: bool,
-    /// Ascii2d requires no API key, so it is governed by its own flag.
-    pub ascii2d_enabled: bool,
-    pub ascii2d_min_similarity: f64,
 
     // Claim
     pub claim_command: String,
@@ -136,8 +133,6 @@ pub const MANAGED_KEYS: &[&str] = &[
     "SAUCENAO_API_KEY",
     "SAUCENAO_MIN_SIMILARITY",
     "LENS_ENABLED",
-    "ASCII2D_ENABLED",
-    "ASCII2D_MIN_SIMILARITY",
     "TRIGGER_KEYWORDS",
     "TARGET_CHAT_IDS",
     "MIN_DELAY_SECONDS",
@@ -201,6 +196,30 @@ pub fn locked_keys() -> Vec<String> {
     // Stable, predictable order for the UI.
     keys.sort();
     keys
+}
+
+/// Remove every env-locked key from an incoming dashboard payload.
+///
+/// Without this, a locked field would still be written into the in-memory
+/// config and would then disagree with the environment variable for the rest
+/// of the process lifetime — the opposite of what "locked" promises. The
+/// dashboard marks these fields read-only, so a value arriving here means a
+/// hand-crafted request or a stale browser tab; either way it must not win.
+///
+/// Non-object payloads are passed through untouched so the caller's own
+/// validation reports the problem.
+fn strip_locked_keys(settings: &Value) -> Value {
+    let Value::Object(map) = settings else {
+        return settings.clone();
+    };
+
+    let mut filtered = map.clone();
+    for key in MANAGED_KEYS {
+        if is_locked_by_env(key) {
+            filtered.remove(*key);
+        }
+    }
+    Value::Object(filtered)
 }
 
 /// Whether the app is running on a platform that injects its own environment
@@ -270,8 +289,6 @@ impl Config {
             saucenao_api_key: env_trim("SAUCENAO_API_KEY", ""),
             saucenao_min_similarity: env_f64("SAUCENAO_MIN_SIMILARITY", 70.0),
             lens_enabled: env_bool("LENS_ENABLED", true),
-            ascii2d_enabled: env_bool("ASCII2D_ENABLED", true),
-            ascii2d_min_similarity: env_f64("ASCII2D_MIN_SIMILARITY", 80.0),
 
             claim_command: env_or("CLAIM_COMMAND", "/protecc"),
             name_format: env_or("NAME_FORMAT", "full").to_lowercase(),
@@ -315,8 +332,6 @@ impl Config {
             "SAUCENAO_API_KEY": self.saucenao_api_key,
             "SAUCENAO_MIN_SIMILARITY": self.saucenao_min_similarity,
             "LENS_ENABLED": self.lens_enabled,
-            "ASCII2D_ENABLED": self.ascii2d_enabled,
-            "ASCII2D_MIN_SIMILARITY": self.ascii2d_min_similarity,
             "TRIGGER_KEYWORDS": self.trigger_keywords.join(", "),
             "TARGET_CHAT_IDS": self
                 .target_chat_ids
@@ -411,12 +426,6 @@ impl Config {
         if let Some(v) = s.get("LENS_ENABLED") {
             self.lens_enabled = as_bool(v, self.lens_enabled);
         }
-        if let Some(v) = s.get("ASCII2D_ENABLED") {
-            self.ascii2d_enabled = as_bool(v, self.ascii2d_enabled);
-        }
-        if let Some(v) = s.get("ASCII2D_MIN_SIMILARITY") {
-            self.ascii2d_min_similarity = as_f64(v, self.ascii2d_min_similarity);
-        }
         if let Some(v) = s.get("TRIGGER_KEYWORDS").and_then(as_str) {
             let list = split_list(&v);
             if !list.is_empty() {
@@ -493,16 +502,19 @@ pub fn env_file_display() -> String {
 
 /// Update configuration from the dashboard and write it back to `.env`.
 ///
-/// Keys locked by a platform environment variable are applied in memory for
-/// this session (so the dashboard stays useful) but are **not** written to
-/// `.env`, because that file is not read on such a host anyway and a stale
-/// value would be misleading.
+/// Keys locked by a platform environment variable are **ignored entirely**:
+/// the incoming value is dropped before it reaches the in-memory config, so
+/// the env value keeps winning for the whole process lifetime. This matches
+/// what the Settings tab shows the user (`data-env-locked` + an "env" chip),
+/// and stops a locked field from silently diverging from the environment.
 ///
 /// Unmanaged lines (for example TELEGRAM_API_ID/HASH) are preserved verbatim.
 pub fn update_and_save(settings: &Value) -> std::io::Result<()> {
+    let settings = strip_locked_keys(settings);
+
     let snapshot = {
         let mut guard = CONFIG.write().expect("config lock poisoned");
-        guard.apply_settings(settings);
+        guard.apply_settings(&settings);
         guard.clone()
     };
 
@@ -515,8 +527,6 @@ pub fn update_and_save(settings: &Value) -> std::io::Result<()> {
         ("SAUCENAO_API_KEY", snapshot.saucenao_api_key.clone()),
         ("SAUCENAO_MIN_SIMILARITY", snapshot.saucenao_min_similarity.to_string()),
         ("LENS_ENABLED", snapshot.lens_enabled.to_string()),
-        ("ASCII2D_ENABLED", snapshot.ascii2d_enabled.to_string()),
-        ("ASCII2D_MIN_SIMILARITY", snapshot.ascii2d_min_similarity.to_string()),
         ("TRIGGER_KEYWORDS", snapshot.trigger_keywords.join(",")),
         (
             "TARGET_CHAT_IDS",
@@ -654,8 +664,6 @@ mod tests {
             "FAIL_KEYWORDS",
             "WEB_PORT",
             "WEB_HOST",
-            "ASCII2D_ENABLED",
-            "ASCII2D_MIN_SIMILARITY",
             "ENV_LOCKED_KEYS",
             "PLATFORM_DEPLOYMENT",
             "ENV_FILE",
@@ -681,53 +689,34 @@ mod tests {
     }
 
     #[test]
-    fn default_ascii2d_aktif_dengan_ambang_80() {
-        // The user-facing defaults: Ascii2d on, 80% threshold.
-        let cfg = Config::from_env();
-        assert!(cfg.ascii2d_enabled, "Ascii2d harus aktif secara default");
-        assert!(
-            (cfg.ascii2d_min_similarity - 80.0).abs() < 1e-9,
-            "ambang Ascii2d harus 80%, dapat {}",
-            cfg.ascii2d_min_similarity
-        );
-    }
-
-    #[test]
     fn as_bool_menghormati_nilai_eksplisit() {
         // Reached through apply_settings, which is private, so the behaviour is
         // asserted via the public path instead: an absent key must not flip a
         // flag, because an unchecked checkbox is never submitted.
         let mut cfg = Config::from_env();
-        let before = cfg.ascii2d_enabled;
+        let before = cfg.lens_enabled;
         cfg.apply_settings(&json!({ "CLAIM_COMMAND": "/protecc" }));
-        assert_eq!(cfg.ascii2d_enabled, before);
+        assert_eq!(cfg.lens_enabled, before);
     }
 
     #[test]
-    fn apply_settings_menyalakan_dan_mematikan_ascii2d() {
+    fn apply_settings_menyalakan_dan_mematikan_lens() {
         let mut cfg = Config::from_env();
 
-        cfg.apply_settings(&json!({ "ASCII2D_ENABLED": "false" }));
-        assert!(!cfg.ascii2d_enabled);
+        cfg.apply_settings(&json!({ "LENS_ENABLED": "false" }));
+        assert!(!cfg.lens_enabled);
 
-        cfg.apply_settings(&json!({ "ASCII2D_ENABLED": "true" }));
-        assert!(cfg.ascii2d_enabled);
+        cfg.apply_settings(&json!({ "LENS_ENABLED": "true" }));
+        assert!(cfg.lens_enabled);
 
-        cfg.apply_settings(&json!({ "ASCII2D_ENABLED": false }));
-        assert!(!cfg.ascii2d_enabled);
+        cfg.apply_settings(&json!({ "LENS_ENABLED": false }));
+        assert!(!cfg.lens_enabled);
 
         // An empty string (what an unchecked-adjacent form field can yield)
         // must leave the current value alone rather than silently disabling.
-        cfg.apply_settings(&json!({ "ASCII2D_ENABLED": true }));
-        cfg.apply_settings(&json!({ "ASCII2D_ENABLED": "" }));
-        assert!(cfg.ascii2d_enabled);
-    }
-
-    #[test]
-    fn apply_settings_menerapkan_ambang_ascii2d() {
-        let mut cfg = Config::from_env();
-        cfg.apply_settings(&json!({ "ASCII2D_MIN_SIMILARITY": 55.5 }));
-        assert!((cfg.ascii2d_min_similarity - 55.5).abs() < 1e-9);
+        cfg.apply_settings(&json!({ "LENS_ENABLED": true }));
+        cfg.apply_settings(&json!({ "LENS_ENABLED": "" }));
+        assert!(cfg.lens_enabled);
     }
 
     #[test]
@@ -735,5 +724,27 @@ mod tests {
         // In the test process no managed key is set by a "platform", so nothing
         // should be reported as locked and `.env` stays authoritative.
         assert!(locked_keys().is_empty(), "tidak ada kunci yang boleh terkunci");
+    }
+
+    #[test]
+    fn strip_locked_keys_membuang_hanya_kunci_yang_terkunci() {
+        // In the test process nothing is locked, so nothing may be dropped.
+        // This is the regression guard for the bug where a locked field was
+        // still applied in memory even though the dashboard showed it as
+        // read-only: the strip must be a no-op when nothing is locked.
+        let payload = json!({
+            "CLAIM_COMMAND": "/test",
+            "TRACEMOE_MIN_SIMILARITY": 0.5,
+        });
+        let stripped = strip_locked_keys(&payload);
+        assert_eq!(stripped, payload, "tanpa kunci terkunci payload tidak boleh berubah");
+    }
+
+    #[test]
+    fn strip_locked_keys_mempertahankan_bentuk_non_objek() {
+        // A malformed payload must reach apply_settings untouched so the
+        // existing validation reports it, instead of being silently rewritten.
+        let payload = json!("bukan objek");
+        assert_eq!(strip_locked_keys(&payload), payload);
     }
 }

@@ -290,15 +290,6 @@
                   {% if env_locked_keys.contains(&"SAUCENAO_MIN_SIMILARITY".to_string()) %}data-env-locked readonly{% endif %}>
               </label>
 
-              <label class="field">
-                <span class="field-label">Ascii2d threshold (%)
-                  {% if env_locked_keys.contains(&"ASCII2D_MIN_SIMILARITY".to_string()) %}<span class="lock-chip">env</span>{% endif %}
-                </span>
-                <input class="input" id="cfg-ascii2d-sim" type="number" step="1" min="0" max="100"
-                  name="ASCII2D_MIN_SIMILARITY" value="{{ ascii2d_similarity }}"
-                  {% if env_locked_keys.contains(&"ASCII2D_MIN_SIMILARITY".to_string()) %}data-env-locked readonly{% endif %}>
-              </label>
-
               <label class="field field-wide">
                 <span class="field-label">SauceNAO API key
                   {% if env_locked_keys.contains(&"SAUCENAO_API_KEY".to_string()) %}<span class="lock-chip">env</span>{% endif %}
@@ -306,12 +297,6 @@
                 <input class="input" id="cfg-saucenao-key" type="password" name="SAUCENAO_API_KEY"
                   value="{{ saucenao_key }}" placeholder="Leave empty to disable SauceNAO"
                   {% if env_locked_keys.contains(&"SAUCENAO_API_KEY".to_string()) %}data-env-locked readonly{% endif %}>
-              </label>
-
-              <label class="check">
-                <input type="checkbox" id="cfg-ascii2d-enabled" name="ASCII2D_ENABLED" {% if ascii2d_enabled %}checked{% endif %}
-                  {% if env_locked_keys.contains(&"ASCII2D_ENABLED".to_string()) %}data-env-locked disabled{% endif %}>
-                <span>Enable Ascii2d (Pixiv/Twitter artwork index, no API key needed)</span>
               </label>
 
               <label class="check">

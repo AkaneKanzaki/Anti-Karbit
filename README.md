@@ -8,8 +8,8 @@ name through **reverse image search**, sends the claim command
 (`/protecc <name>`), verifies the game bot's reply, and retries with alternate
 names when a claim is rejected.
 
-> **Free, and no AI API keys.** Uses IQDB, SauceNAO, Ascii2d, Trace.moe and
-> Google Lens, enriched with data from AniList.
+> **Free, and no AI API keys.** Uses IQDB, SauceNAO, Trace.moe and Google Lens,
+> enriched with data from AniList.
 
 ---
 
@@ -21,12 +21,12 @@ entirely.
 | | Python | Rust |
 |---|---|---|
 | Runtime size | `.venv` ~63 MB | binary ~11 MB |
-| Reverse search | 4 engines **sequentially** = 7.40 s | 5 engines **in parallel** = 2.78 s |
+| Reverse search | 4 engines **sequentially** = 7.40 s | 4 engines **in parallel** = 2.78 s |
 | Claim verification | polls every 0.8 s, **blocks** the listener | event driven, **non-blocking** |
 | Repeated character | always ~2.8 s | hash cache, effectively instant |
 | Delay before claiming | 0.5–1.5 s (artificial) | 0 (configurable) |
 
-The 2.78 s figure is measured, not estimated — on `test_waifu.png` with the
+The 2.78 s figure is measured, not estimated — on `test_waifu.png` with all four
 engines enabled.
 
 **Why non-blocking verification matters.** Previously a single claim waiting for
@@ -50,8 +50,7 @@ Message arrives in a group
       |
       +-- fan out to every active engine
             IQDB ---+
-         SauceNAO ---+
-          Ascii2d ---+  results stream back as
+         SauceNAO ---+  results stream back as
          Trace.moe ---+  each engine finishes
         Google Lens ---+
                       |
@@ -68,20 +67,16 @@ so changing it in the dashboard takes effect without a restart.
 |---|---|---|---|
 | IQDB | no | yes | Booru databases (Danbooru, Gelbooru, Konachan, yande.re) |
 | Trace.moe | no | yes | Anime screenshots; returns episode + timestamp |
-| Ascii2d | no | `ASCII2D_ENABLED` | Pixiv/Twitter artwork; runs colour then monochrome |
 | SauceNAO | yes | when a key is set | Highest quality when keyed |
 | Google Lens | no | `LENS_ENABLED` | Most fragile; results must pass AniList verification |
 
-**Ascii2d has no similarity score.** Unlike IQDB, it only knows whether an
-artwork is indexed, not how closely it matches. So `ASCII2D_MIN_SIMILARITY` is
-compared against the *evidence strength* of the matched row:
-
-| Threshold | Rows that qualify |
-|---|---|
-| 80 (default) | character **and** series found |
-| 75 | also a bare character name |
-| 65 | also a guess derived from a Pixiv title |
-| 0 | everything |
+An **Ascii2d** engine was implemented and then removed: Ascii2d protects its
+search endpoints with a Cloudflare bot challenge, so `POST /search/file` always
+returns `403` regardless of User-Agent, `Referer`, session cookie, or a valid
+Rails `authenticity_token`. It is not a code problem that can be fixed by
+adjusting the request, and working around it would need a headless browser,
+which does not fit the 1 GB deploy target. See
+[Notes](#notes) for the verified detail.
 
 ---
 
@@ -214,7 +209,7 @@ changes there last for the life of the container. See
 
 ```powershell
 cd rust
-cargo test          # 85 unit and HTTP integration tests
+cargo test          # 64 unit and HTTP integration tests
 cargo clippy        # lints
 ```
 
@@ -234,7 +229,6 @@ rust/src/
     mod.rs             engine fan-out
     base.rs            CharacterInfo, name splitting
     iqdb.rs            IQDB plus booru tag classification
-    ascii2d.rs         Ascii2d (Pixiv/Twitter), reuses the booru tag classifier
     saucenao.rs        SauceNAO
     tracemoe.rs        Trace.moe
     lens.rs            Google Lens (must pass AniList verification)
@@ -282,4 +276,14 @@ the SSE extension is not used and is not shipped.
 - Google Lens is the most fragile engine because Google's crawl results are
   unstructured. Every candidate it produces **must** pass AniList verification
   before it may be used in a claim.
+- **Ascii2d is unusable from a server.** Verified 2026-09-18. `GET /` returns
+  `200`, but both form endpoints are behind a Cloudflare bot challenge:
+  `POST /search/file` and `POST /search/uri` return `403` with a
+  `<title>Just a moment...</title>` body. This held true with a browser
+  User-Agent, a `Referer`, the `_session_id` cookie issued by the homepage, and
+  a valid Rails `authenticity_token` (the homepage form exposes one for both
+  endpoints). Since only form submission is challenged, not the whole host, the
+  block is a bot rule rather than a geoblock or an outage. A server-side
+  implementation therefore cannot work without a headless browser or a
+  challenge-solving proxy.
 - Timestamps in the live console are **UTC**.
