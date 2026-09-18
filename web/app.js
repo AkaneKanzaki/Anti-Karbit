@@ -164,6 +164,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
     item.append(head, detail);
 
+    // On a failure the backend sends `reason`; without surfacing it the feed
+    // only ever said "failed", which hid whether no candidate was found at all
+    // or the game bot actually rejected a name.
+    if (!success && event.reason) {
+      const reason = document.createElement("div");
+      reason.className = "feed-meta";
+      reason.textContent = event.reason;
+      item.append(reason);
+    }
+
     document.getElementById("feed-empty")?.remove();
     feed.prepend(item);
 

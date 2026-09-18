@@ -676,6 +676,7 @@ pub struct IndexTemplate {
     pub min_delay: f64,
     pub max_delay: f64,
     pub verify_timeout: f64,
+    pub send_timeout: f64,
     pub success_keywords: String,
     pub fail_keywords: String,
 }
@@ -788,6 +789,7 @@ async fn index_page(
         min_delay: cfg.min_delay_seconds,
         max_delay: cfg.max_delay_seconds,
         verify_timeout: cfg.verify_timeout_seconds,
+        send_timeout: cfg.send_timeout_seconds,
         success_keywords: cfg.success_keywords.join(", "),
         fail_keywords: cfg.fail_keywords.join(", "),
     })
@@ -1424,6 +1426,7 @@ mod tests {
             min_delay: 0.0,
             max_delay: 0.0,
             verify_timeout: 5.0,
+            send_timeout: 5.0,
             success_keywords: "now protected".into(),
             fail_keywords: "not quite right".into(),
         }

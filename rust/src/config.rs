@@ -44,6 +44,9 @@ pub struct Config {
     pub min_delay_seconds: f64,
     pub max_delay_seconds: f64,
     pub verify_timeout_seconds: f64,
+    /// Upper bound on the `send_message` call itself. Without this a stuck
+    /// request hangs the claim task forever.
+    pub send_timeout_seconds: f64,
 
     // Reply detection
     pub success_keywords: Vec<String>,
@@ -163,6 +166,7 @@ impl Config {
             min_delay_seconds: env_f64("MIN_DELAY_SECONDS", 0.5),
             max_delay_seconds: env_f64("MAX_DELAY_SECONDS", 1.5),
             verify_timeout_seconds: env_f64("VERIFY_TIMEOUT_SECONDS", 5.0),
+            send_timeout_seconds: env_f64("SEND_TIMEOUT_SECONDS", 5.0),
 
             success_keywords: split_list_lower(&env_or("SUCCESS_KEYWORDS", DEFAULT_SUCCESS_KEYWORDS)),
             fail_keywords: split_list_lower(&env_or("FAIL_KEYWORDS", DEFAULT_FAIL_KEYWORDS)),
@@ -205,6 +209,7 @@ impl Config {
             "MIN_DELAY_SECONDS": self.min_delay_seconds,
             "MAX_DELAY_SECONDS": self.max_delay_seconds,
             "VERIFY_TIMEOUT_SECONDS": self.verify_timeout_seconds,
+            "SEND_TIMEOUT_SECONDS": self.send_timeout_seconds,
             "SUCCESS_KEYWORDS": self.success_keywords.join(", "),
             "FAIL_KEYWORDS": self.fail_keywords.join(", "),
             "WEB_PORT": self.web_port,
@@ -298,6 +303,9 @@ impl Config {
         if let Some(v) = s.get("VERIFY_TIMEOUT_SECONDS") {
             self.verify_timeout_seconds = as_f64(v, self.verify_timeout_seconds);
         }
+        if let Some(v) = s.get("SEND_TIMEOUT_SECONDS") {
+            self.send_timeout_seconds = as_f64(v, self.send_timeout_seconds);
+        }
     }
 }
 
@@ -362,6 +370,7 @@ pub fn update_and_save(settings: &Value) -> std::io::Result<()> {
         ("MIN_DELAY_SECONDS", snapshot.min_delay_seconds.to_string()),
         ("MAX_DELAY_SECONDS", snapshot.max_delay_seconds.to_string()),
         ("VERIFY_TIMEOUT_SECONDS", snapshot.verify_timeout_seconds.to_string()),
+        ("SEND_TIMEOUT_SECONDS", snapshot.send_timeout_seconds.to_string()),
     ];
 
     let path = env_file_path();
@@ -458,6 +467,7 @@ mod tests {
             "MIN_DELAY_SECONDS",
             "MAX_DELAY_SECONDS",
             "VERIFY_TIMEOUT_SECONDS",
+            "SEND_TIMEOUT_SECONDS",
             "SUCCESS_KEYWORDS",
             "FAIL_KEYWORDS",
             "WEB_PORT",

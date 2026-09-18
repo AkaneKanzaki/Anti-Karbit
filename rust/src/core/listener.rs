@@ -207,8 +207,18 @@ impl WaifuListener {
             None => (None, false),
         };
 
-        // PeerRef derives straight from PeerId; no network call needed.
-        let peer_ref = peer.to_ambient_ref();
+        // Resolve the PeerRef so it carries a valid `access_hash`.
+        // `to_ambient_ref()` produces an auth-less ref, and Telegram silently
+        // drops sends to channels/supergroups without an access hash: the
+        // request never gets a response, so `send_message` hangs forever
+        // instead of returning an error. `resolve_peer` -> `to_ref` yields a
+        // properly authenticated ref. Only fall back to the ambient ref when
+        // resolution genuinely fails, so a transient error degrades to the old
+        // behaviour instead of dropping the claim.
+        let peer_ref = self
+            .resolve_peer_ref(&peer)
+            .await
+            .unwrap_or_else(|| peer.to_ambient_ref());
         let reply_to = Some(msg.id());
 
         if let Some(info) = cached {
@@ -379,6 +389,36 @@ impl WaifuListener {
 
     pub fn cache_stats(&self) -> (usize, u64, u64) {
         self.cache.stats()
+    }
+
+    /// Resolve a peer into a `PeerRef` that carries a valid `access_hash`.
+    ///
+    /// This matters for channels and supergroups: an auth-less ref makes
+    /// Telegram drop the request without answering, which hangs `send_message`.
+    /// Returns `None` when the peer cannot be resolved, so the caller can fall
+    /// back to an ambient ref.
+    async fn resolve_peer_ref(&self, peer: &PeerId) -> Option<PeerRef> {
+        // `resolve_peer` takes a PeerRef, and the only conversion from a bare
+        // PeerId is the ambient one. That is fine to *look up*: the server
+        // returns the peer together with its access hash, and `to_ref()` then
+        // yields an authenticated ref suitable for sending.
+        match self.client.resolve_peer(peer.to_ambient_ref()).await {
+            Ok(found) => match found.to_ref().await {
+                Ok(Some(peer_ref)) => Some(peer_ref),
+                Ok(None) => {
+                    warn!("Peer {peer:?} has no usable access hash; sends may not be delivered.");
+                    None
+                }
+                Err(e) => {
+                    warn!("Could not build a PeerRef for {peer:?}: {e}");
+                    None
+                }
+            },
+            Err(e) => {
+                warn!("Could not resolve peer {peer:?}: {e}");
+                None
+            }
+        }
     }
 
     /// Labels of the currently active engines, for the dashboard.

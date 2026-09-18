@@ -119,6 +119,10 @@ impl Claimer {
 
         let candidates = character.claim_names(&cfg.name_format);
 
+        // Set when a send is rejected or times out, so the caller can report a
+        // real transmission failure instead of "no name candidate".
+        let mut last_send_failed = false;
+
         for (idx, name) in candidates.iter().enumerate() {
             let cmd = format!("{} {}", cfg.claim_command, name.trim());
 
@@ -132,20 +136,40 @@ impl Claimer {
             let rx = self.register_pending(peer);
 
             info!("Sending: '{cmd}'");
-            let sent = client
-                .send_message(
+            // `send_message` must be bounded. Without a timeout a stuck request
+            // (for example a channel whose access hash is missing) never
+            // resolves, so this task hangs forever and the claim silently never
+            // happens — no success, no failure, nothing on the dashboard.
+            let sent = tokio::time::timeout(
+                Duration::from_secs_f64(cfg.send_timeout_seconds),
+                client.send_message(
                     peer_ref,
                     InputMessage::new().text(cmd.clone()).reply_to(reply_to_msg_id),
-                )
-                .await;
+                ),
+            )
+            .await;
+
+            let sent = match sent {
+                Ok(result) => result,
+                Err(_) => {
+                    warn!(
+                        "Sending '{cmd}' timed out after {}s; the message may not have been delivered.",
+                        cfg.send_timeout_seconds
+                    );
+                    self.clear_pending(peer);
+                    last_send_failed = true;
+                    continue;
+                }
+            };
 
             if let Err(e) = sent {
                 warn!("Could not send '{cmd}': {e}");
                 self.clear_pending(peer);
+                last_send_failed = true;
                 continue;
             }
 
-            info!("Waiting for the game bot reply ({}s timeout)...", cfg.verify_timeout_seconds);
+            info!("Message sent. Waiting for the game bot reply ({}s timeout)...", cfg.verify_timeout_seconds);
 
             match tokio::time::timeout(Duration::from_secs_f64(cfg.verify_timeout_seconds), rx).await
             {
@@ -206,7 +230,12 @@ impl Claimer {
         ClaimResult {
             name: candidates.first().cloned().unwrap_or_default(),
             success: false,
-            response_text: None,
+            // Surface a transmission failure distinctly: it means the command
+            // was never delivered, which is very different from the game bot
+            // rejecting a name.
+            response_text: last_send_failed.then(|| {
+                "Pesan klaim gagal dikirim ke Telegram (timeout atau error kirim)".to_string()
+            }),
         }
     }
 }
