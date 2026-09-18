@@ -88,7 +88,10 @@ environment **always wins**:
 1. On startup, variables already present in the environment are recorded as
    *locked*.
 2. Locked keys are shown in the UI with an `env` chip and rendered read-only.
-3. Values from the environment are never overwritten in `.env`.
+3. A locked key is **ignored entirely** when a settings form is submitted: the
+   incoming value is dropped before it reaches the running config, so the
+   environment value keeps winning. Values from the environment are never
+   written back to `.env` either.
 
 This matters on Railway and similar hosts, where the container filesystem is
 **ephemeral**. A `.env` written by the dashboard disappears on the next restart
